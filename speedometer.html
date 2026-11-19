@@ -270,6 +270,12 @@
 
       .history { display: grid; gap: 10px; }
       .history h2 { font-size: 1.05rem; margin: 0; }
+      .map-panel { display: grid; gap: 10px; background: var(--card); border: 1.5px solid var(--card-line); border-radius: 14px; padding: 14px; }
+      .map-panel[hidden] { display: none; }
+      .map-panel h2 { font-size: 1.05rem; margin: 0; }
+      #tripMap { width: 100%; height: 360px; min-height: 300px; border-radius: 10px; background: var(--bg-grad); }
+      .map-legend { margin: 0; color: var(--ink-soft); font-size: 0.9rem; line-height: 1.5; }
+      .map-status { margin: 0; color: var(--ink-soft); font-size: 0.88rem; line-height: 1.45; }
       .trip-card {
         background: var(--card); border: 1.5px solid var(--card-line);
         border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px;
@@ -367,6 +373,13 @@
         </div>
       </section>
 
+      <section class="map-panel" id="mapPanel" aria-labelledby="mapTitle" hidden>
+        <h2 id="mapTitle">Trip map</h2>
+        <p class="map-legend">Blue: recorded route. Red: GPS speed at least 5 km/h above the matched permanent speed limit. School-period limits may differ.</p>
+        <div id="tripMap" role="application" aria-label="Map of the selected bus trip"></div>
+        <p class="map-status" id="mapStatus" role="status" aria-live="polite"></p>
+      </section>
+
       <p class="note">Tap <strong>START TRIP</strong> when you board and <strong>STOP TRIP</strong> when you get off. Keep this page open and your screen awake; GPS tracking may pause if the phone locks or the browser moves to the background.</p>
       <section class="history" aria-labelledby="historyTitle">
         <h2 id="historyTitle">Saved trips on this phone</h2>
@@ -407,6 +420,13 @@
         var displayedTrip = null;
         var savedTrips = [];
         var timerId = null;
+        var tripMapInstance = null;
+        var tripMapTileLayer = null;
+        var tripMapLayers = [];
+        var speedLimitGrid = null;
+        var speedLimitGridPromise = null;
+        var SPEED_LIMIT_DATA_URL = "https://donnees.montreal.ca/fr/dataset/1ef0211f-8101-410c-9266-b1f2db360669/resource/579f1179-c7db-4453-adbb-0729db8d4764/download/limites_de_vitesses_20260226.zip";
+        var MAP_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
         // ---------- elements ----------
         var dot = document.getElementById("dot");
@@ -425,6 +445,9 @@
         var statBrakes = document.getElementById("statBrakes");
         var statIdle = document.getElementById("statIdle");
         var tripHistory = document.getElementById("tripHistory");
+        var mapPanel = document.getElementById("mapPanel");
+        var tripMapEl = document.getElementById("tripMap");
+        var mapStatus = document.getElementById("mapStatus");
         var busRouteInput = document.getElementById("busRoute");
         var busNumberInput = document.getElementById("busNumber");
         var directionInput = document.getElementById("direction");
@@ -756,6 +779,10 @@
             detail.textContent = (saved.busRoute ? "Route " + saved.busRoute + " · " : "") + (saved.busNumber ? "Bus " + saved.busNumber + " · " : (saved.busNumberOrId ? "Bus " + saved.busNumberOrId + " · " : "")) + (saved.direction ? "Direction " + saved.direction + " · " : "") + "Duration " + fmtTime(saved.elapsedMs || 0) + " · Distance " + ((saved.distanceM || 0) / 1000).toFixed(2) + " km · Top " + Math.round(saved.maxSpeedKmh || 0) + " km/h · Average " + Number(saved.averageSpeedKmh || 0).toFixed(1) + " km/h · Idle " + fmtTime(saved.idleTimeMs || 0) + " · Possible hard braking " + (saved.possibleHardBrakingEvents || 0) + " · " + ((saved.observations || []).length) + " GPS observations";
             var actions = document.createElement("div");
             actions.className = "trip-actions";
+            var viewMap = document.createElement("button");
+            viewMap.type = "button"; viewMap.textContent = "View trip map";
+            viewMap.addEventListener("click", function () { showTripMap(saved); });
+            actions.appendChild(viewMap);
             var download = document.createElement("button");
             download.type = "button"; download.textContent = "Download trip JSON";
             download.addEventListener("click", function () { downloadTrip(saved, index); });
@@ -772,6 +799,191 @@
           link.download = "speedbus-trip-" + new Date(saved.startedAt).toISOString().replace(/[:.]/g, "-") + ".json";
           document.body.appendChild(link); link.click(); link.remove();
           setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        }
+
+        function loadScriptOnce(id, src) {
+          var existing = document.getElementById(id);
+          if (existing) {
+            if (existing.dataset.loaded === "true") return Promise.resolve();
+            return new Promise(function (resolve, reject) {
+              existing.addEventListener("load", resolve, { once: true });
+              existing.addEventListener("error", reject, { once: true });
+            });
+          }
+          return new Promise(function (resolve, reject) {
+            var script = document.createElement("script");
+            script.id = id; script.src = src; script.async = true;
+            script.onload = function () { script.dataset.loaded = "true"; resolve(); };
+            script.onerror = function () { reject(new Error("Could not load map helper")); };
+            document.head.appendChild(script);
+          });
+        }
+
+        function ensureLeaflet() {
+          if (window.L) return Promise.resolve();
+          if (!document.getElementById("leaflet-css")) {
+            var css = document.createElement("link");
+            css.id = "leaflet-css"; css.rel = "stylesheet";
+            css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+            document.head.appendChild(css);
+          }
+          return loadScriptOnce("leaflet-js", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
+        }
+
+        function eachLineSegment(geometry, callback) {
+          if (!geometry || !geometry.coordinates) return;
+          var lines = geometry.type === "LineString" ? [geometry.coordinates] :
+            (geometry.type === "MultiLineString" ? geometry.coordinates : []);
+          lines.forEach(function (line) {
+            for (var i = 1; i < line.length; i++) callback(line[i - 1], line[i]);
+          });
+        }
+
+        function buildSpeedLimitGrid(collection) {
+          var grid = Object.create(null);
+          var cellSize = 0.002;
+          function add(segment) {
+            var latPad = 0.00035;
+            var lonPad = 0.00045;
+            var minLat = Math.min(segment.a[1], segment.b[1]) - latPad;
+            var maxLat = Math.max(segment.a[1], segment.b[1]) + latPad;
+            var minLon = Math.min(segment.a[0], segment.b[0]) - lonPad;
+            var maxLon = Math.max(segment.a[0], segment.b[0]) + lonPad;
+            for (var y = Math.floor(minLat / cellSize); y <= Math.floor(maxLat / cellSize); y++) {
+              for (var x = Math.floor(minLon / cellSize); x <= Math.floor(maxLon / cellSize); x++) {
+                var key = y + ":" + x;
+                if (!grid[key]) grid[key] = [];
+                grid[key].push(segment);
+              }
+            }
+          }
+          (collection.features || []).forEach(function (feature) {
+            var p = feature.properties || {};
+            var rawLimit = p.Vitesse || p.vitesse || p.VITESSE;
+            var limit = Number.parseFloat(rawLimit);
+            if (!Number.isFinite(limit) || limit <= 0 || limit > 130) return;
+            eachLineSegment(feature.geometry, function (a, b) {
+              if (a.length >= 2 && b.length >= 2) add({ a: a, b: b, limit: limit });
+            });
+          });
+          return grid;
+        }
+
+        function ensureSpeedLimitGrid() {
+          if (speedLimitGrid) return Promise.resolve(speedLimitGrid);
+          if (speedLimitGridPromise) return speedLimitGridPromise;
+          speedLimitGridPromise = ensureLeaflet().then(function () {
+            return loadScriptOnce("shpjs-script", "https://unpkg.com/shpjs@latest/dist/shp.min.js");
+          }).then(function () {
+            if (!window.shp) throw new Error("Speed-limit file reader is unavailable");
+            return fetch(SPEED_LIMIT_DATA_URL);
+          }).then(function (response) {
+            if (!response.ok) throw new Error("Speed-limit data could not be downloaded");
+            return response.arrayBuffer();
+          }).then(function (archive) {
+            return window.shp(archive);
+          }).then(function (geojson) {
+            var collection = Array.isArray(geojson) ? geojson.find(function (item) { return item && item.features; }) : geojson;
+            if (!collection || !collection.features) throw new Error("The Montréal speed-limit file was not readable");
+            speedLimitGrid = buildSpeedLimitGrid(collection);
+            return speedLimitGrid;
+          }).catch(function (error) {
+            speedLimitGridPromise = null;
+            throw error;
+          });
+          return speedLimitGridPromise;
+        }
+
+        function distanceToSegmentM(lat, lon, segment) {
+          var cosLat = Math.cos(lat * Math.PI / 180);
+          var scaleX = 111320 * cosLat, scaleY = 111320;
+          var px = 0, py = 0;
+          var ax = (segment.a[0] - lon) * scaleX, ay = (segment.a[1] - lat) * scaleY;
+          var bx = (segment.b[0] - lon) * scaleX, by = (segment.b[1] - lat) * scaleY;
+          var dx = bx - ax, dy = by - ay;
+          var denom = dx * dx + dy * dy;
+          var t = denom ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / denom)) : 0;
+          return Math.hypot(ax + t * dx, ay + t * dy);
+        }
+
+        function nearestSpeedLimit(lat, lon) {
+          if (!speedLimitGrid) return null;
+          var cellSize = 0.002;
+          var cy = Math.floor(lat / cellSize), cx = Math.floor(lon / cellSize);
+          var candidates = [];
+          for (var y = cy - 1; y <= cy + 1; y++) {
+            for (var x = cx - 1; x <= cx + 1; x++) {
+              var bucket = speedLimitGrid[y + ":" + x];
+              if (bucket) candidates = candidates.concat(bucket);
+            }
+          }
+          var best = null, bestDistance = 35;
+          candidates.forEach(function (segment) {
+            var d = distanceToSegmentM(lat, lon, segment);
+            if (d < bestDistance) { bestDistance = d; best = segment.limit; }
+          });
+          return best;
+        }
+
+        function clearTripMapLayers() {
+          if (!tripMapInstance) return;
+          tripMapLayers.forEach(function (layer) { tripMapInstance.removeLayer(layer); });
+          tripMapLayers = [];
+        }
+
+        function showTripMap(saved) {
+          mapPanel.hidden = false;
+          mapStatus.textContent = "Loading trip map and Montréal speed limits…";
+          mapPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          var points = (saved.observations || []).filter(function (o) {
+            return o && Number.isFinite(Number(o.latitude)) && Number.isFinite(Number(o.longitude)) &&
+              Number.isFinite(Number(o.accuracyM)) && Number(o.accuracyM) <= 35;
+          });
+          if (points.length < 2) {
+            mapStatus.textContent = "This trip does not have enough accurate GPS points to draw a route.";
+            return;
+          }
+          ensureSpeedLimitGrid().then(function () {
+            if (!tripMapInstance) {
+              tripMapInstance = window.L.map(tripMapEl, { scrollWheelZoom: false });
+              tripMapTileLayer = window.L.tileLayer(MAP_TILE_URL, {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+              }).addTo(tripMapInstance);
+            }
+            clearTripMapLayers();
+            var bounds = [];
+            for (var i = 1; i < points.length; i++) {
+              var previous = points[i - 1], current = points[i];
+              var lat1 = Number(previous.latitude), lon1 = Number(previous.longitude);
+              var lat2 = Number(current.latitude), lon2 = Number(current.longitude);
+              var coords = [[lat1, lon1], [lat2, lon2]];
+              bounds.push([lat1, lon1], [lat2, lon2]);
+              var speed1 = Number(previous.speedKmh), speed2 = Number(current.speedKmh);
+              var measured = Number.isFinite(speed1) && Number.isFinite(speed2) ? (speed1 + speed2) / 2 : null;
+              var limit = nearestSpeedLimit((lat1 + lat2) / 2, (lon1 + lon2) / 2);
+              var aboveLimit = measured !== null && limit !== null && measured >= limit + 5;
+              var line = window.L.polyline(coords, {
+                color: aboveLimit ? "#d62828" : "#1677d2",
+                weight: 6, opacity: 0.9
+              }).addTo(tripMapInstance);
+              var detail = measured === null ? "GPS speed unavailable" : "Recorded speed: " + measured.toFixed(1) + " km/h";
+              detail += limit === null ? " · No Montréal speed limit matched" : " · Mapped permanent limit: " + limit + " km/h";
+              if (aboveLimit) detail += " · 5+ km/h above mapped limit";
+              line.bindPopup(detail);
+              tripMapLayers.push(line);
+            }
+            if (points.length) {
+              var first = points[0], last = points[points.length - 1];
+              tripMapLayers.push(window.L.marker([Number(first.latitude), Number(first.longitude)]).addTo(tripMapInstance).bindPopup("Trip start"));
+              tripMapLayers.push(window.L.marker([Number(last.latitude), Number(last.longitude)]).addTo(tripMapInstance).bindPopup("Trip end"));
+            }
+            tripMapInstance.fitBounds(bounds, { padding: [20, 20] });
+            window.setTimeout(function () { tripMapInstance.invalidateSize(); }, 100);
+            mapStatus.textContent = "Approximate GPS route. Red sections are 5+ km/h above a matched permanent Montréal speed limit; blue includes both below-limit and unmatched sections. School-period limits are not applied automatically. The map uses OpenStreetMap tiles.";
+          }).catch(function () {
+            mapStatus.textContent = "The route map or Montréal speed-limit data could not load. Try again with a stable internet connection.";
+          });
         }
 
         window.addEventListener("pagehide", function () {
