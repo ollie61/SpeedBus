@@ -943,7 +943,7 @@
             mapStatus.textContent = "This trip does not have enough accurate GPS points to draw a route.";
             return;
           }
-          ensureSpeedLimitGrid().then(function () {
+          ensureLeaflet().then(function () {
             if (!tripMapInstance) {
               tripMapInstance = window.L.map(tripMapEl, { scrollWheelZoom: false });
               tripMapTileLayer = window.L.tileLayer(MAP_TILE_URL, {
@@ -951,6 +951,8 @@
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
               }).addTo(tripMapInstance);
             }
+            return ensureSpeedLimitGrid().catch(function () { return null; });
+          }).then(function () {
             clearTripMapLayers();
             var bounds = [];
             for (var i = 1; i < points.length; i++) {
@@ -960,7 +962,12 @@
               var coords = [[lat1, lon1], [lat2, lon2]];
               bounds.push([lat1, lon1], [lat2, lon2]);
               var speed1 = Number(previous.speedKmh), speed2 = Number(current.speedKmh);
-              var measured = Number.isFinite(speed1) && Number.isFinite(speed2) ? (speed1 + speed2) / 2 : null;
+              var haveSpeeds = previous.speedKmh !== null && previous.speedKmh !== undefined &&
+                current.speedKmh !== null && current.speedKmh !== undefined &&
+                previous.rejectionReason !== "no_usable_speed_sample" &&
+                current.rejectionReason !== "no_usable_speed_sample" &&
+                Number.isFinite(speed1) && Number.isFinite(speed2);
+              var measured = haveSpeeds ? (speed1 + speed2) / 2 : null;
               var limit = nearestSpeedLimit((lat1 + lat2) / 2, (lon1 + lon2) / 2);
               var aboveLimit = measured !== null && limit !== null && measured >= limit + 5;
               var line = window.L.polyline(coords, {
@@ -980,7 +987,9 @@
             }
             tripMapInstance.fitBounds(bounds, { padding: [20, 20] });
             window.setTimeout(function () { tripMapInstance.invalidateSize(); }, 100);
-            mapStatus.textContent = "Approximate GPS route. Red sections are 5+ km/h above a matched permanent Montréal speed limit; blue includes both below-limit and unmatched sections. School-period limits are not applied automatically. The map uses OpenStreetMap tiles.";
+            mapStatus.textContent = speedLimitGrid
+              ? "Approximate GPS route. Red sections are 5+ km/h above a matched permanent Montréal speed limit; blue includes both below-limit and unmatched sections. School-period limits are not applied automatically. The map uses OpenStreetMap tiles."
+              : "Approximate GPS route shown in blue. Montréal speed-limit data is unavailable, so no sections are classified as above the limit. The map uses OpenStreetMap tiles.";
           }).catch(function () {
             mapStatus.textContent = "The route map or Montréal speed-limit data could not load. Try again with a stable internet connection.";
           });
