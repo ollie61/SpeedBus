@@ -766,7 +766,7 @@
           toggleBtn.classList.remove("stop");
           accuracyEl.textContent = "";
           renderStats(); renderHistory();
-          setStatus(interrupted || !tripSaved ? "wait" : "", showStatus || (!tripSaved ? "Trip kept for recovery — phone storage is full" : (interrupted ? "Trip saved — GPS tracking was interrupted" : "Trip saved on this phone")));
+          setStatus(interrupted || !tripSaved ? "wait" : "", !tripSaved ? "Trip kept for recovery — phone storage is full" : (showStatus || (interrupted ? "Trip saved — GPS tracking was interrupted" : "Trip saved on this phone")));
         }
 
         toggleBtn.addEventListener("click", function () {
