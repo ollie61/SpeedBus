@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="data:," />
-    <title>Speedometer</title>
+    <meta name="description" content="SpeedBus passenger-operated STM bus trip recorder">
+    <title>SpeedBus 0.2 — Trip Recorder</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -65,6 +66,9 @@
         align-items: stretch;
         gap: 18px;
       }
+      .brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+      .brand h1 { font-size: 1.35rem; margin: 0; letter-spacing: -0.02em; }
+      .version { color: var(--ink-soft); font: 600 0.82rem "IBM Plex Mono", ui-monospace, monospace; }
 
       /* ---------- status ---------- */
       .status-row {
@@ -263,12 +267,35 @@
         text-align: center;
         margin: 2px 6px 0;
       }
+
+      .history { display: grid; gap: 10px; }
+      .history h2 { font-size: 1.05rem; margin: 0; }
+      .trip-card {
+        background: var(--card); border: 1.5px solid var(--card-line);
+        border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px;
+      }
+      .trip-card strong { font-size: 0.98rem; }
+      .trip-detail { color: var(--ink-soft); font-size: 0.9rem; line-height: 1.45; }
+      .trip-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .trip-actions button {
+        appearance: none; border: 1.5px solid var(--card-line); background: var(--bg);
+        color: var(--ink); border-radius: 10px; padding: 8px 12px; font: inherit;
+        font-weight: 700; min-height: 44px; cursor: pointer;
+      }
+      .trip-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .trip-info label { display: grid; gap: 5px; font-size: 0.82rem; font-weight: 700; color: var(--ink-soft); }
+      .trip-info input { width: 100%; border: 1.5px solid var(--card-line); border-radius: 10px; padding: 10px 11px; background: var(--card); color: var(--ink); font: inherit; }
+      @media (max-width: 360px) { .trip-info { grid-template-columns: 1fr; } }
+      .empty-history { color: var(--ink-soft); margin: 0; font-size: 0.92rem; }
+      .disclaimer { font-size: 0.84rem; line-height: 1.5; color: var(--ink-soft); margin: 0; }
+      .btn-main:focus-visible, .trip-actions button:focus-visible { outline: 3px solid #287ac5; outline-offset: 3px; }
     </style>
   </head>
   <body>
     <main>
+      <header class="brand"><h1>SpeedBus</h1><span class="version">TRIP RECORDER · 0.2</span></header>
       <div class="status-row">
-        <span class="status"><span class="dot" id="dot"></span><span id="statusText">Not tracking yet</span></span>
+        <span class="status" role="status" aria-live="polite"><span class="dot" id="dot"></span><span id="statusText">Ready to record a trip</span></span>
         <span class="accuracy" id="accuracy"></span>
       </div>
 
@@ -293,14 +320,15 @@
       <div class="msg" id="msg" role="alert"></div>
 
       <div class="controls">
-        <button class="btn-main" id="toggleBtn" type="button">Start tracking</button>
-        <div class="row-btns">
-          <div class="seg" role="group" aria-label="Speed unit">
-            <button type="button" id="unitKmh" aria-pressed="true">km/h</button>
-            <button type="button" id="unitMph" aria-pressed="false">mph</button>
-          </div>
-          <button class="btn-reset" id="resetBtn" type="button">Reset trip</button>
+        <div class="trip-info">
+          <label for="busNumber">Bus number / ID (optional)
+            <input id="busNumber" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 1234 or fleet ID" />
+          </label>
+          <label for="direction">Direction (optional)
+            <input id="direction" type="text" autocomplete="off" maxlength="60" placeholder="e.g. toward downtown" />
+          </label>
         </div>
+        <button class="btn-main" id="toggleBtn" type="button">START TRIP</button>
       </div>
 
       <section class="stats" aria-label="Trip statistics">
@@ -320,9 +348,18 @@
           <div class="label">Time</div>
           <div class="value"><span id="statTime">0:00</span></div>
         </div>
+        <div class="stat">
+          <div class="label">Possible hard braking</div>
+          <div class="value"><span id="statBrakes">0</span></div>
+        </div>
       </section>
 
-      <p class="note">Tap <strong>Start tracking</strong> and allow location access — the dial then follows your bus live using your phone's GPS. Keep this page open while you ride; readings are most accurate outdoors with a clear view of the sky.</p>
+      <p class="note">Tap <strong>START TRIP</strong> when you board and <strong>STOP TRIP</strong> when you get off. Keep this page open and your screen awake; GPS tracking may pause if the phone locks or the browser moves to the background.</p>
+      <section class="history" aria-labelledby="historyTitle">
+        <h2 id="historyTitle">Saved trips on this phone</h2>
+        <div id="tripHistory"><p class="empty-history">No saved trips yet.</p></div>
+      </section>
+      <p class="disclaimer">Trip records stay in this browser on this phone. GPS readings can be inaccurate and are for personal reporting only; they are not certified evidence of speeding or dangerous driving. Use the browser’s download option to save a trip report file.</p>
     </main>
 
     <script>
@@ -332,25 +369,30 @@
         // ---------- constants ----------
         var SWEEP_START = -120;          // degrees at 0 speed
         var SWEEP_END = 120;             // degrees at max speed
-        var MAX = { kmh: 120, mph: 80 }; // dial full-scale per unit
+        var MAX = 120;                   // dial full-scale, km/h
         var MS_TO_KMH = 3.6;
-        var KMH_TO_MPH = 0.621371;
+        var STORAGE_KEY = "speedbus.tripRecords.v1";
+        var ACTIVE_KEY = "speedbus.activeTrip.v1";
+        var MAX_ACCURACY_M = 35;
+        var MAX_SPEED_KMH = 130;
 
         // ---------- state ----------
-        var unit = "kmh";
         var tracking = false;
         var watchId = null;
         var wakeLock = null;
 
         var displayKmh = 0;   // smoothed speed shown by needle/readout
         var targetKmh = 0;    // latest measured speed
-        var lastFix = null;   // {lat, lon, t}
+        var lastFix = null;   // last quality-checked position
         var recent = [];      // recent raw km/h samples for median smoothing
 
         var maxKmh = 0;
         var distM = 0;
-        var speedSum = 0, speedCount = 0; // for average while moving
-        var startTime = null;
+        var brakeCount = 0;
+        var lastBrakeAt = 0;
+        var trip = null;
+        var displayedTrip = null;
+        var savedTrips = [];
         var timerId = null;
 
         // ---------- elements ----------
@@ -362,17 +404,15 @@
         var needleGroup = document.getElementById("needleGroup");
         var ticksG = document.getElementById("ticks");
         var toggleBtn = document.getElementById("toggleBtn");
-        var resetBtn = document.getElementById("resetBtn");
-        var unitKmhBtn = document.getElementById("unitKmh");
-        var unitMphBtn = document.getElementById("unitMph");
         var msg = document.getElementById("msg");
         var statMax = document.getElementById("statMax");
         var statAvg = document.getElementById("statAvg");
         var statDist = document.getElementById("statDist");
         var statTime = document.getElementById("statTime");
-        var statMaxUnit = document.getElementById("statMaxUnit");
-        var statAvgUnit = document.getElementById("statAvgUnit");
-        var statDistUnit = document.getElementById("statDistUnit");
+        var statBrakes = document.getElementById("statBrakes");
+        var tripHistory = document.getElementById("tripHistory");
+        var busNumberInput = document.getElementById("busNumber");
+        var directionInput = document.getElementById("direction");
 
         // ---------- dial drawing ----------
         function polar(cx, cy, r, deg) {
@@ -380,15 +420,15 @@
           return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
         }
         function angleFor(valueInUnit) {
-          var frac = valueInUnit / MAX[unit];
+          var frac = valueInUnit / MAX;
           if (frac < 0) frac = 0;
           if (frac > 1) frac = 1;
           return SWEEP_START + frac * (SWEEP_END - SWEEP_START);
         }
         function drawTicks() {
-          var step = unit === "kmh" ? 10 : 5;
-          var majorEvery = unit === "kmh" ? 20 : 10;
-          var max = MAX[unit];
+          var step = 10;
+          var majorEvery = 20;
+          var max = MAX;
           var html = "";
           for (var v = 0; v <= max; v += step) {
             var a = SWEEP_START + (v / max) * (SWEEP_END - SWEEP_START);
@@ -396,7 +436,7 @@
             var r1 = major ? 148 : 158;
             var p1 = polar(200, 200, r1, a);
             var p2 = polar(200, 200, 168, a);
-            var hot = (unit === "kmh" && v >= 100) || (unit === "mph" && v >= 65);
+            var hot = v >= 100;
             html += '<line x1="' + p1[0].toFixed(1) + '" y1="' + p1[1].toFixed(1) +
                     '" x2="' + p2[0].toFixed(1) + '" y2="' + p2[1].toFixed(1) +
                     '" stroke="' + (hot ? "#ff5a1f" : (major ? "var(--dial-tick-major)" : "var(--dial-tick)")) +
@@ -411,10 +451,9 @@
         }
 
         // ---------- conversion / formatting ----------
-        function fromKmh(kmh) { return unit === "kmh" ? kmh : kmh * KMH_TO_MPH; }
-        function unitLabel() { return unit === "kmh" ? "km/h" : "mph"; }
+        function unitLabel() { return "km/h"; }
         function fmtTime(ms) {
-          var s = Math.floor(ms / 1000);
+          var s = Math.max(0, Math.floor(ms / 1000));
           var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
           var mm = (h > 0 && m < 10) ? "0" + m : "" + m;
           var ss = sec < 10 ? "0" + sec : "" + sec;
@@ -422,19 +461,14 @@
         }
 
         function renderStats() {
-          statMax.textContent = Math.round(fromKmh(maxKmh));
-          var avg = speedCount ? speedSum / speedCount : 0;
-          statAvg.textContent = Math.round(fromKmh(avg));
-          if (unit === "kmh") {
-            statDist.textContent = (distM / 1000).toFixed(2);
-            statDistUnit.textContent = "km";
-          } else {
-            statDist.textContent = (distM / 1609.344).toFixed(2);
-            statDistUnit.textContent = "mi";
-          }
-          statMaxUnit.textContent = unitLabel();
-          statAvgUnit.textContent = unitLabel();
-          if (startTime) statTime.textContent = fmtTime(Date.now() - startTime);
+          statMax.textContent = Math.round(maxKmh);
+          var currentTrip = trip || displayedTrip;
+          var elapsed = currentTrip ? (trip ? Math.max(0, Date.now() - trip.startedAt) : (currentTrip.elapsedMs || 0)) : 0;
+          var avg = elapsed > 0 ? (distM / 1000) / (elapsed / 3600000) : 0;
+          statAvg.textContent = avg.toFixed(1);
+          statDist.textContent = (distM / 1000).toFixed(2);
+          statTime.textContent = fmtTime(elapsed);
+          statBrakes.textContent = brakeCount;
         }
 
         // ---------- needle animation ----------
@@ -442,7 +476,7 @@
           var diff = targetKmh - displayKmh;
           displayKmh += diff * 0.12;
           if (Math.abs(diff) < 0.05) displayKmh = targetKmh;
-          var shown = fromKmh(displayKmh);
+          var shown = displayKmh;
           needleGroup.setAttribute("transform", "rotate(" + angleFor(shown).toFixed(2) + " 200 200)");
           bigSpeed.textContent = Math.round(shown);
           requestAnimationFrame(animate);
@@ -474,52 +508,113 @@
         }
         function hideMsg() { msg.classList.remove("show"); }
 
+        function storageRead(key, fallback) {
+          try { var value = localStorage.getItem(key); return value ? JSON.parse(value) : fallback; }
+          catch (e) { return fallback; }
+        }
+        function saveActive() {
+          if (!trip) return;
+          try { localStorage.setItem(ACTIVE_KEY, JSON.stringify(trip)); }
+          catch (e) { showMsg("Phone storage is full", "This trip could not be saved locally. Download or remove older saved trips after stopping."); }
+        }
+        function saveTrips() {
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedTrips.slice(0, 30))); }
+          catch (e) { showMsg("Phone storage is full", "The trip summary could not be saved. Download the trip report if it is still shown below."); }
+        }
+        function addObservation(observation) {
+          if (!trip) return;
+          trip.observations.push(observation);
+          saveActive();
+        }
         function onPosition(pos) {
           hideMsg();
+          if (!tracking || !trip) return;
           var c = pos.coords;
-          var t = pos.timestamp;
-          var kmh = null;
-
-          if (typeof c.speed === "number" && isFinite(c.speed) && c.speed >= 0) {
-            kmh = c.speed * MS_TO_KMH;
+          var t = pos.timestamp || Date.now();
+          var accuracy = Number(c.accuracy);
+          var lat = Number(c.latitude), lon = Number(c.longitude);
+          var observation = {
+            timestamp: new Date(t).toISOString(), latitude: isFinite(lat) ? lat : null,
+            longitude: isFinite(lon) ? lon : null, accuracyM: isFinite(accuracy) ? accuracy : null,
+            gpsSpeedMps: (typeof c.speed === "number" && isFinite(c.speed)) ? c.speed : null,
+            speedKmh: null, accepted: false, rejectionReason: ""
+          };
+          if (!isFinite(lat) || !isFinite(lon) || !isFinite(accuracy) || accuracy <= 0) {
+            observation.rejectionReason = "invalid_position_or_accuracy";
+            addObservation(observation);
+            setStatus("wait", "GPS fix is invalid — waiting for a better signal");
+            return;
           }
+          if (accuracy > MAX_ACCURACY_M) {
+            observation.rejectionReason = "accuracy_over_35m";
+            addObservation(observation);
+            accuracyEl.textContent = "±" + Math.round(accuracy) + " m";
+            setStatus("wait", "Weak GPS signal — fix accuracy is over 35 m");
+            return;
+          }
+
+          var derivedKmh = null, movedM = 0, dt = 0;
           if (lastFix) {
-            var dt = (t - lastFix.t) / 1000;
-            var d = haversineM(lastFix.lat, lastFix.lon, c.latitude, c.longitude);
-            if (dt > 0.4) {
-              // accumulate distance only from reasonably accurate fixes
-              if (c.accuracy && c.accuracy < 60 && d < dt * 60) distM += d;
-              if (kmh === null) kmh = (d / dt) * MS_TO_KMH;
+            dt = (t - lastFix.t) / 1000;
+            movedM = haversineM(lastFix.lat, lastFix.lon, lat, lon);
+            if (dt >= 1 && dt <= 30 && movedM <= dt * 36 && movedM > Math.max(5, (accuracy + lastFix.accuracy) * 0.5)) {
+              derivedKmh = (movedM / dt) * MS_TO_KMH;
+            }
+            // Ignore long gaps for distance; the GPS may have been suspended.
+            if (dt > 0 && dt <= 30 && movedM > Math.max(3, (accuracy + lastFix.accuracy) * 0.2) && movedM <= dt * 36) {
+              distM += movedM;
             }
           }
-          lastFix = { lat: c.latitude, lon: c.longitude, t: t };
-          if (kmh === null) kmh = 0;
-
-          // median-of-recent smoothing kills GPS jitter spikes
+          var gpsKmh = observation.gpsSpeedMps === null || observation.gpsSpeedMps < 0 ? null : observation.gpsSpeedMps * MS_TO_KMH;
+          if (gpsKmh === 0 && derivedKmh !== null && derivedKmh > 2) gpsKmh = null;
+          var kmh = gpsKmh !== null && gpsKmh <= MAX_SPEED_KMH ? gpsKmh : derivedKmh;
+          if (gpsKmh !== null && gpsKmh > MAX_SPEED_KMH) observation.rejectionReason = "gps_speed_over_130kmh";
+          if (kmh === null) {
+            kmh = recent.length ? recent[recent.length - 1] : 0;
+            observation.rejectionReason = observation.rejectionReason || "no_usable_speed_sample";
+          }
+          if (lastFix && dt > 0 && dt <= 3 && Math.abs(kmh - lastFix.speedKmh) > 50 && kmh > 8) {
+            observation.rejectionReason = "implausible_speed_jump";
+            kmh = lastFix.speedKmh;
+          }
+          lastFix = { lat: lat, lon: lon, t: t, accuracy: accuracy, speedKmh: kmh };
           recent.push(kmh);
           if (recent.length > 5) recent.shift();
           var smooth = median(recent);
-          if (smooth < 1.2) smooth = 0; // treat crawl as stopped
+          if (smooth < 1.2) smooth = 0;
           targetKmh = smooth;
+          observation.speedKmh = Number(kmh.toFixed(2));
+          observation.accepted = observation.rejectionReason === "" || observation.rejectionReason === "no_usable_speed_sample";
+          if (!observation.rejectionReason) observation.rejectionReason = null;
 
-          if (smooth > maxKmh) maxKmh = smooth;
-          if (smooth >= 2) { speedSum += smooth; speedCount++; }
+          var previous = trip.lastAcceptedSpeed;
+          if (previous && previous.speedKmh >= 25 && previous.speedKmh - smooth >= 15 && (t - previous.timestampMs) <= 3000 && (t - lastBrakeAt) >= 8000) {
+            brakeCount++;
+            lastBrakeAt = t;
+            trip.brakingEvents.push({ timestamp: new Date(t).toISOString(), fromKmh: Number(previous.speedKmh.toFixed(1)), toKmh: Number(smooth.toFixed(1)), possible: true });
+          }
+          if (observation.accepted) trip.lastAcceptedSpeed = { speedKmh: smooth, timestampMs: t };
+          if (observation.accepted && smooth > maxKmh) maxKmh = smooth;
+          trip.distanceM = distM;
+          trip.maxSpeedKmh = maxKmh;
+          trip.possibleHardBrakingEvents = brakeCount;
+          addObservation(observation);
 
-          setStatus("live", "Live — GPS tracking");
-          accuracyEl.textContent = (c.accuracy ? "±" + Math.round(c.accuracy) + " m" : "");
+          setStatus("live", "GPS tracking — trip recording");
+          accuracyEl.textContent = "±" + Math.round(accuracy) + " m";
           renderStats();
+          renderHistory();
         }
 
         function onError(err) {
-          if (err.code === 1) { // permission denied
-            setStatus("err", "Location blocked");
-            showMsg("Location access is off",
-              "The speedometer needs your location to measure speed. Allow location for this page in your browser settings, then tap Start tracking again.");
-            stopTracking(false);
+          if (err.code === 1) {
+            setStatus("err", "Location access blocked");
+            showMsg("Allow location access", "SpeedBus needs your phone’s location while recording. Enable location access for this page in your browser, then start the trip again.");
+            finishTrip(true, "Location permission was denied", true);
           } else if (err.code === 3) {
-            setStatus("wait", "GPS signal is taking a while…");
+            setStatus("wait", "GPS unavailable — waiting for a location fix");
           } else {
-            setStatus("wait", "Waiting for a GPS signal…");
+            setStatus("wait", "GPS signal lost — waiting to reconnect");
           }
         }
 
@@ -532,7 +627,19 @@
           }
         }
         document.addEventListener("visibilitychange", function () {
-          if (tracking && document.visibilityState === "visible") grabWakeLock();
+          if (!tracking) return;
+          if (document.visibilityState === "hidden") {
+            trip.lastVisibleAt = Date.now();
+            setStatus("wait", "Page hidden — GPS may pause while the phone is locked");
+            saveActive();
+          } else {
+            if (trip.lastVisibleAt && Date.now() - trip.lastVisibleAt > 15000) {
+              lastFix = null; recent = []; targetKmh = 0;
+              setStatus("wait", "Tracking resumed — GPS signal may have been interrupted");
+            }
+            trip.lastVisibleAt = null;
+            grabWakeLock();
+          }
         });
 
         // ---------- start / stop ----------
@@ -544,64 +651,125 @@
             return;
           }
           hideMsg();
+          if (!trip) {
+            maxKmh = 0; distM = 0; brakeCount = 0; lastBrakeAt = 0; recent = []; displayedTrip = null;
+            trip = { id: "trip-" + Date.now(), startedAt: Date.now(), stoppedAt: null, busNumberOrId: busNumberInput.value.trim() || null, direction: directionInput.value.trim() || null, distanceM: 0, maxSpeedKmh: 0, possibleHardBrakingEvents: 0, brakingEvents: [], observations: [], complete: false, interrupted: false };
+          }
           setStatus("wait", "Waiting for a GPS signal…");
           tracking = true;
-          toggleBtn.textContent = "Stop tracking";
+          toggleBtn.textContent = "STOP TRIP";
           toggleBtn.classList.add("stop");
-          if (!startTime) {
-            startTime = Date.now();
-            timerId = setInterval(renderStats, 1000);
-          }
+          timerId = setInterval(function () { renderStats(); saveActive(); }, 5000);
+          saveActive();
           watchId = navigator.geolocation.watchPosition(onPosition, onError, {
             enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 20000
+            maximumAge: 1000,
+            timeout: 15000
           });
           grabWakeLock();
         }
-        function stopTracking(resetStatus) {
+        function finishTrip(interrupted, reason, showStatus) {
+          if (!trip) return;
           tracking = false;
           if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
           if (timerId) { clearInterval(timerId); timerId = null; }
           if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
           targetKmh = 0;
-          recent = [];
           lastFix = null;
-          toggleBtn.textContent = "Start tracking";
+          trip.stoppedAt = interrupted ? (trip.observations.length ? Date.parse(trip.observations[trip.observations.length - 1].timestamp) : Date.now()) : Date.now();
+          trip.elapsedMs = Math.max(0, trip.stoppedAt - trip.startedAt);
+          trip.distanceM = distM;
+          trip.maxSpeedKmh = maxKmh;
+          trip.averageSpeedKmh = trip.elapsedMs > 0 ? (distM / 1000) / (trip.elapsedMs / 3600000) : 0;
+          trip.possibleHardBrakingEvents = brakeCount;
+          trip.complete = !interrupted;
+          trip.interrupted = !!interrupted;
+          trip.interruptionReason = reason || null;
+          delete trip.lastAcceptedSpeed;
+          delete trip.lastVisibleAt;
+          displayedTrip = trip;
+          savedTrips.unshift(trip);
+          savedTrips = savedTrips.slice(0, 30);
+          saveTrips();
+          try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
+          trip = null;
+          toggleBtn.textContent = "START TRIP";
           toggleBtn.classList.remove("stop");
-          if (resetStatus !== false) {
-            setStatus("", "Paused — tap Start to resume");
-            accuracyEl.textContent = "";
-          }
+          accuracyEl.textContent = "";
+          renderStats(); renderHistory();
+          setStatus(interrupted ? "wait" : "", showStatus || (interrupted ? "Trip saved — GPS tracking was interrupted" : "Trip saved on this phone"));
         }
 
         toggleBtn.addEventListener("click", function () {
-          if (tracking) stopTracking(true); else startTracking();
+          if (tracking) finishTrip(false, null, "Trip saved on this phone"); else startTracking();
         });
 
-        resetBtn.addEventListener("click", function () {
-          maxKmh = 0; distM = 0; speedSum = 0; speedCount = 0;
-          startTime = tracking ? Date.now() : null;
-          statTime.textContent = "0:00";
-          renderStats();
-        });
-
-        function setUnit(u) {
-          unit = u;
-          unitKmhBtn.setAttribute("aria-pressed", u === "kmh" ? "true" : "false");
-          unitMphBtn.setAttribute("aria-pressed", u === "mph" ? "true" : "false");
-          bigUnit.textContent = unitLabel();
-          drawTicks();
-          renderStats();
+        function renderHistory() {
+          if (!savedTrips.length) { tripHistory.innerHTML = '<p class="empty-history">No saved trips yet.</p>'; return; }
+          tripHistory.innerHTML = "";
+          savedTrips.forEach(function (saved, index) {
+            var card = document.createElement("article");
+            card.className = "trip-card";
+            var title = document.createElement("strong");
+            title.textContent = new Date(saved.startedAt).toLocaleString() + (saved.interrupted ? " · Interrupted" : "");
+            var detail = document.createElement("div");
+            detail.className = "trip-detail";
+            detail.textContent = (saved.busNumberOrId ? "Bus " + saved.busNumberOrId + " · " : "") + (saved.direction ? saved.direction + " · " : "") + "Duration " + fmtTime(saved.elapsedMs || 0) + " · Distance " + ((saved.distanceM || 0) / 1000).toFixed(2) + " km · Top " + Math.round(saved.maxSpeedKmh || 0) + " km/h · Average " + Number(saved.averageSpeedKmh || 0).toFixed(1) + " km/h · Possible hard braking " + (saved.possibleHardBrakingEvents || 0) + " · " + ((saved.observations || []).length) + " GPS observations";
+            var actions = document.createElement("div");
+            actions.className = "trip-actions";
+            var download = document.createElement("button");
+            download.type = "button"; download.textContent = "Download trip JSON";
+            download.addEventListener("click", function () { downloadTrip(saved, index); });
+            actions.appendChild(download);
+            card.appendChild(title); card.appendChild(detail); card.appendChild(actions);
+            tripHistory.appendChild(card);
+          });
         }
-        unitKmhBtn.addEventListener("click", function () { setUnit("kmh"); });
-        unitMphBtn.addEventListener("click", function () { setUnit("mph"); });
+        function downloadTrip(saved, index) {
+          var blob = new Blob([JSON.stringify(saved, null, 2)], { type: "application/json" });
+          var url = URL.createObjectURL(blob);
+          var link = document.createElement("a");
+          link.href = url;
+          link.download = "speedbus-trip-" + new Date(saved.startedAt).toISOString().replace(/[:.]/g, "-") + ".json";
+          document.body.appendChild(link); link.click(); link.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        }
+
+        window.addEventListener("pagehide", function () {
+          if (tracking && trip) finishTrip(true, "Page was closed, reloaded, or suspended", "Trip saved as interrupted");
+        });
 
         // ---------- init ----------
+        savedTrips = storageRead(STORAGE_KEY, []);
+        if (!Array.isArray(savedTrips)) savedTrips = [];
+        if (savedTrips.length) {
+          displayedTrip = savedTrips[0];
+          maxKmh = Number(displayedTrip.maxSpeedKmh || 0);
+          distM = Number(displayedTrip.distanceM || 0);
+          brakeCount = Number(displayedTrip.possibleHardBrakingEvents || 0);
+        }
+        var recovered = storageRead(ACTIVE_KEY, null);
+        if (recovered && recovered.startedAt) {
+          var recoveredEnd = recovered.observations && recovered.observations.length ? Date.parse(recovered.observations[recovered.observations.length - 1].timestamp) : recovered.startedAt;
+          recovered.stoppedAt = recoveredEnd;
+          recovered.elapsedMs = Math.max(0, recoveredEnd - recovered.startedAt);
+          recovered.interrupted = true; recovered.complete = false;
+          recovered.interruptionReason = "Page was reloaded or tracking was interrupted";
+          recovered.distanceM = recovered.distanceM || 0;
+          recovered.maxSpeedKmh = recovered.maxSpeedKmh || 0;
+          recovered.averageSpeedKmh = recovered.elapsedMs > 0 ? (recovered.distanceM / 1000) / (recovered.elapsedMs / 3600000) : 0;
+          savedTrips.unshift(recovered); savedTrips = savedTrips.slice(0, 30); saveTrips();
+          displayedTrip = recovered;
+          maxKmh = Number(recovered.maxSpeedKmh || 0); distM = Number(recovered.distanceM || 0); brakeCount = Number(recovered.possibleHardBrakingEvents || 0);
+          try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
+          setStatus("wait", "Previous trip saved — tracking was interrupted");
+        }
         drawTicks();
+        renderHistory();
         renderStats();
         requestAnimationFrame(animate);
       })();
     </script>
   </body>
 </html>
+
