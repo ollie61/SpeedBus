@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>Speedometer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      button, [role="button"], select, summary, input:not([type="checkbox"], [type="radio"]) { min-height: 2.75rem; }
+
+      :root {
+        --bg: #eceee9;
+        --bg-grad: #dfe3da;
+        --ink: #171a16;
+        --ink-soft: #4c534b;
+        --card: #ffffff;
+        --card-line: #d5d9d0;
+        --accent: #e8490f;
+        --accent-ink: #ffffff;
+        --ok: #1d8a4e;
+        --warn: #b97a08;
+        --bad: #c22e2e;
+        --dial-face: #14161a;
+        --dial-ring: #262a30;
+        --dial-tick: #9aa3ab;
+        --dial-tick-major: #e8ecf0;
+        --dial-num: #c9d1d9;
+        --needle: #ff5a1f;
+        --hub: #2b2f36;
+        --digital: #ffffff;
+        --digital-soft: #8f979f;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101210;
+          --bg-grad: #0a0c0a;
+          --ink: #eef1ec;
+          --ink-soft: #a7aea4;
+          --card: #1a1d1a;
+          --card-line: #2e332e;
+          --dial-face: #0c0e11;
+          --dial-ring: #23262c;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: linear-gradient(180deg, var(--bg) 0%, var(--bg-grad) 100%);
+        color: var(--ink);
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+      }
+      main {
+        max-width: 560px;
+        margin: 0 auto;
+        padding: 20px 18px 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 18px;
+      }
+
+      /* ---------- status ---------- */
+      .status-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--ink-soft);
+        padding: 8px 4px;
+      }
+      .dot {
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #9aa39c;
+        flex: none;
+      }
+      .dot.live { background: var(--ok); animation: pulse 1.6s ease-in-out infinite; }
+      .dot.wait { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+      .dot.err  { background: var(--bad); }
+      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+      @media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } }
+      .accuracy {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-size: 0.85rem;
+        color: var(--ink-soft);
+      }
+
+      /* ---------- dial ---------- */
+      .dial-wrap {
+        display: flex;
+        justify-content: center;
+        padding: 6px 0 0;
+      }
+      .dial {
+        width: min(88vw, 430px);
+        height: auto;
+        display: block;
+        filter: drop-shadow(0 18px 30px rgba(10, 12, 10, 0.28));
+      }
+      .tick-label {
+        font-family: "Archivo", sans-serif;
+        font-weight: 700;
+        fill: var(--dial-num);
+      }
+      .needle-group { will-change: transform; }
+
+      .digital {
+        text-align: center;
+        margin-top: -8px;
+      }
+      .digital .big {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-weight: 700;
+        font-size: clamp(3.4rem, 17vw, 5.2rem);
+        line-height: 1;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+      }
+      .digital .unit {
+        font-size: 1.05rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-top: 4px;
+      }
+
+      /* ---------- controls ---------- */
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 4px;
+      }
+      .btn-main {
+        appearance: none;
+        border: none;
+        border-radius: 14px;
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-family: inherit;
+        font-size: 1.2rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        padding: 16px 20px;
+        min-height: 60px;
+        cursor: pointer;
+        width: 100%;
+      }
+      .btn-main:active { transform: scale(0.99); }
+      .btn-main.stop { background: var(--ink); color: var(--bg); }
+      .row-btns {
+        display: flex;
+        gap: 12px;
+        align-items: stretch;
+      }
+      .seg {
+        display: flex;
+        flex: 1;
+        background: var(--card);
+        border: 1.5px solid var(--card-line);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .seg button {
+        flex: 1;
+        appearance: none;
+        border: none;
+        background: transparent;
+        color: var(--ink-soft);
+        font-family: inherit;
+        font-size: 1rem;
+        font-weight: 700;
+        padding: 10px 8px;
+        min-height: 48px;
+        cursor: pointer;
+      }
+      .seg button[aria-pressed="true"] {
+        background: var(--ink);
+        color: var(--bg);
+      }
+      .btn-reset {
+        appearance: none;
+        background: var(--card);
+        border: 1.5px solid var(--card-line);
+        border-radius: 12px;
+        color: var(--ink);
+        font-family: inherit;
+        font-size: 1rem;
+        font-weight: 700;
+        padding: 10px 18px;
+        min-height: 48px;
+        cursor: pointer;
+      }
+
+      /* ---------- stats ---------- */
+      .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .stat {
+        background: var(--card);
+        border: 1.5px solid var(--card-line);
+        border-radius: 14px;
+        padding: 14px 16px 12px;
+      }
+      .stat .label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      .stat .value {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-weight: 600;
+        font-size: 1.7rem;
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+      }
+      .stat .value small {
+        font-size: 0.95rem;
+        color: var(--ink-soft);
+        font-weight: 500;
+      }
+
+      /* ---------- message / help ---------- */
+      .msg {
+        display: none;
+        border-radius: 14px;
+        padding: 16px 18px;
+        font-size: 1rem;
+        line-height: 1.5;
+        background: #fdf3e3;
+        border: 1.5px solid #e8cf9e;
+        color: #5c4303;
+      }
+      @media (prefers-color-scheme: dark) {
+        .msg { background: #2c2410; border-color: #5c4d1e; color: #f0dc9f; }
+      }
+      .msg.show { display: block; }
+      .msg strong { display: block; margin-bottom: 4px; font-size: 1.05rem; }
+
+      .note {
+        font-size: 0.92rem;
+        line-height: 1.55;
+        color: var(--ink-soft);
+        text-align: center;
+        margin: 2px 6px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="status-row">
+        <span class="status"><span class="dot" id="dot"></span><span id="statusText">Not tracking yet</span></span>
+        <span class="accuracy" id="accuracy"></span>
+      </div>
+
+      <div class="dial-wrap">
+        <svg class="dial" id="dial" viewBox="0 0 400 400" role="img" aria-label="Speedometer dial">
+          <circle cx="200" cy="200" r="196" fill="var(--dial-ring)" />
+          <circle cx="200" cy="200" r="184" fill="var(--dial-face)" />
+          <g id="ticks"></g>
+          <g id="needleGroup" class="needle-group">
+            <polygon points="200,200 191,214 196,102 200,92 204,102 209,214" fill="var(--needle)" />
+          </g>
+          <circle cx="200" cy="200" r="21" fill="var(--hub)" stroke="#454b54" stroke-width="2" />
+          <circle cx="200" cy="200" r="6" fill="var(--needle)" />
+        </svg>
+      </div>
+
+      <div class="digital" aria-live="off">
+        <div class="big" id="bigSpeed">0</div>
+        <div class="unit" id="bigUnit">km/h</div>
+      </div>
+
+      <div class="msg" id="msg" role="alert"></div>
+
+      <div class="controls">
+        <button class="btn-main" id="toggleBtn" type="button">Start tracking</button>
+        <div class="row-btns">
+          <div class="seg" role="group" aria-label="Speed unit">
+            <button type="button" id="unitKmh" aria-pressed="true">km/h</button>
+            <button type="button" id="unitMph" aria-pressed="false">mph</button>
+          </div>
+          <button class="btn-reset" id="resetBtn" type="button">Reset trip</button>
+        </div>
+      </div>
+
+      <section class="stats" aria-label="Trip statistics">
+        <div class="stat">
+          <div class="label">Top speed</div>
+          <div class="value"><span id="statMax">0</span> <small id="statMaxUnit">km/h</small></div>
+        </div>
+        <div class="stat">
+          <div class="label">Average</div>
+          <div class="value"><span id="statAvg">0</span> <small id="statAvgUnit">km/h</small></div>
+        </div>
+        <div class="stat">
+          <div class="label">Distance</div>
+          <div class="value"><span id="statDist">0.00</span> <small id="statDistUnit">km</small></div>
+        </div>
+        <div class="stat">
+          <div class="label">Time</div>
+          <div class="value"><span id="statTime">0:00</span></div>
+        </div>
+      </section>
+
+      <p class="note">Tap <strong>Start tracking</strong> and allow location access — the dial then follows your bus live using your phone's GPS. Keep this page open while you ride; readings are most accurate outdoors with a clear view of the sky.</p>
+    </main>
+
+    <script>
+      (function () {
+        "use strict";
+
+        // ---------- constants ----------
+        var SWEEP_START = -120;          // degrees at 0 speed
+        var SWEEP_END = 120;             // degrees at max speed
+        var MAX = { kmh: 120, mph: 80 }; // dial full-scale per unit
+        var MS_TO_KMH = 3.6;
+        var KMH_TO_MPH = 0.621371;
+
+        // ---------- state ----------
+        var unit = "kmh";
+        var tracking = false;
+        var watchId = null;
+        var wakeLock = null;
+
+        var displayKmh = 0;   // smoothed speed shown by needle/readout
+        var targetKmh = 0;    // latest measured speed
+        var lastFix = null;   // {lat, lon, t}
+        var recent = [];      // recent raw km/h samples for median smoothing
+
+        var maxKmh = 0;
+        var distM = 0;
+        var speedSum = 0, speedCount = 0; // for average while moving
+        var startTime = null;
+        var timerId = null;
+
+        // ---------- elements ----------
+        var dot = document.getElementById("dot");
+        var statusText = document.getElementById("statusText");
+        var accuracyEl = document.getElementById("accuracy");
+        var bigSpeed = document.getElementById("bigSpeed");
+        var bigUnit = document.getElementById("bigUnit");
+        var needleGroup = document.getElementById("needleGroup");
+        var ticksG = document.getElementById("ticks");
+        var toggleBtn = document.getElementById("toggleBtn");
+        var resetBtn = document.getElementById("resetBtn");
+        var unitKmhBtn = document.getElementById("unitKmh");
+        var unitMphBtn = document.getElementById("unitMph");
+        var msg = document.getElementById("msg");
+        var statMax = document.getElementById("statMax");
+        var statAvg = document.getElementById("statAvg");
+        var statDist = document.getElementById("statDist");
+        var statTime = document.getElementById("statTime");
+        var statMaxUnit = document.getElementById("statMaxUnit");
+        var statAvgUnit = document.getElementById("statAvgUnit");
+        var statDistUnit = document.getElementById("statDistUnit");
+
+        // ---------- dial drawing ----------
+        function polar(cx, cy, r, deg) {
+          var rad = (deg - 90) * Math.PI / 180;
+          return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
+        }
+        function angleFor(valueInUnit) {
+          var frac = valueInUnit / MAX[unit];
+          if (frac < 0) frac = 0;
+          if (frac > 1) frac = 1;
+          return SWEEP_START + frac * (SWEEP_END - SWEEP_START);
+        }
+        function drawTicks() {
+          var step = unit === "kmh" ? 10 : 5;
+          var majorEvery = unit === "kmh" ? 20 : 10;
+          var max = MAX[unit];
+          var html = "";
+          for (var v = 0; v <= max; v += step) {
+            var a = SWEEP_START + (v / max) * (SWEEP_END - SWEEP_START);
+            var major = (v % majorEvery === 0);
+            var r1 = major ? 148 : 158;
+            var p1 = polar(200, 200, r1, a);
+            var p2 = polar(200, 200, 168, a);
+            var hot = (unit === "kmh" && v >= 100) || (unit === "mph" && v >= 65);
+            html += '<line x1="' + p1[0].toFixed(1) + '" y1="' + p1[1].toFixed(1) +
+                    '" x2="' + p2[0].toFixed(1) + '" y2="' + p2[1].toFixed(1) +
+                    '" stroke="' + (hot ? "#ff5a1f" : (major ? "var(--dial-tick-major)" : "var(--dial-tick)")) +
+                    '" stroke-width="' + (major ? 4 : 2) + '" stroke-linecap="round" />';
+            if (major) {
+              var pl = polar(200, 200, 122, a);
+              html += '<text class="tick-label" x="' + pl[0].toFixed(1) + '" y="' + pl[1].toFixed(1) +
+                      '" font-size="24" text-anchor="middle" dominant-baseline="middle">' + v + "</text>";
+            }
+          }
+          ticksG.innerHTML = html;
+        }
+
+        // ---------- conversion / formatting ----------
+        function fromKmh(kmh) { return unit === "kmh" ? kmh : kmh * KMH_TO_MPH; }
+        function unitLabel() { return unit === "kmh" ? "km/h" : "mph"; }
+        function fmtTime(ms) {
+          var s = Math.floor(ms / 1000);
+          var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+          var mm = (h > 0 && m < 10) ? "0" + m : "" + m;
+          var ss = sec < 10 ? "0" + sec : "" + sec;
+          return h > 0 ? h + ":" + mm + ":" + ss : m + ":" + ss;
+        }
+
+        function renderStats() {
+          statMax.textContent = Math.round(fromKmh(maxKmh));
+          var avg = speedCount ? speedSum / speedCount : 0;
+          statAvg.textContent = Math.round(fromKmh(avg));
+          if (unit === "kmh") {
+            statDist.textContent = (distM / 1000).toFixed(2);
+            statDistUnit.textContent = "km";
+          } else {
+            statDist.textContent = (distM / 1609.344).toFixed(2);
+            statDistUnit.textContent = "mi";
+          }
+          statMaxUnit.textContent = unitLabel();
+          statAvgUnit.textContent = unitLabel();
+          if (startTime) statTime.textContent = fmtTime(Date.now() - startTime);
+        }
+
+        // ---------- needle animation ----------
+        function animate() {
+          var diff = targetKmh - displayKmh;
+          displayKmh += diff * 0.12;
+          if (Math.abs(diff) < 0.05) displayKmh = targetKmh;
+          var shown = fromKmh(displayKmh);
+          needleGroup.setAttribute("transform", "rotate(" + angleFor(shown).toFixed(2) + " 200 200)");
+          bigSpeed.textContent = Math.round(shown);
+          requestAnimationFrame(animate);
+        }
+
+        // ---------- geo helpers ----------
+        function haversineM(lat1, lon1, lat2, lon2) {
+          var R = 6371000, toRad = Math.PI / 180;
+          var dLat = (lat2 - lat1) * toRad, dLon = (lon2 - lon1) * toRad;
+          var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          return 2 * R * Math.asin(Math.sqrt(a));
+        }
+        function median(arr) {
+          var s = arr.slice().sort(function (a, b) { return a - b; });
+          return s[Math.floor(s.length / 2)];
+        }
+
+        function setStatus(mode, text) {
+          dot.className = "dot" + (mode ? " " + mode : "");
+          statusText.textContent = text;
+        }
+        function showMsg(title, body) {
+          msg.innerHTML = "<strong></strong><span></span>";
+          msg.querySelector("strong").textContent = title;
+          msg.querySelector("span").textContent = body;
+          msg.classList.add("show");
+        }
+        function hideMsg() { msg.classList.remove("show"); }
+
+        function onPosition(pos) {
+          hideMsg();
+          var c = pos.coords;
+          var t = pos.timestamp;
+          var kmh = null;
+
+          if (typeof c.speed === "number" && isFinite(c.speed) && c.speed >= 0) {
+            kmh = c.speed * MS_TO_KMH;
+          }
+          if (lastFix) {
+            var dt = (t - lastFix.t) / 1000;
+            var d = haversineM(lastFix.lat, lastFix.lon, c.latitude, c.longitude);
+            if (dt > 0.4) {
+              // accumulate distance only from reasonably accurate fixes
+              if (c.accuracy && c.accuracy < 60 && d < dt * 60) distM += d;
+              if (kmh === null) kmh = (d / dt) * MS_TO_KMH;
+            }
+          }
+          lastFix = { lat: c.latitude, lon: c.longitude, t: t };
+          if (kmh === null) kmh = 0;
+
+          // median-of-recent smoothing kills GPS jitter spikes
+          recent.push(kmh);
+          if (recent.length > 5) recent.shift();
+          var smooth = median(recent);
+          if (smooth < 1.2) smooth = 0; // treat crawl as stopped
+          targetKmh = smooth;
+
+          if (smooth > maxKmh) maxKmh = smooth;
+          if (smooth >= 2) { speedSum += smooth; speedCount++; }
+
+          setStatus("live", "Live — GPS tracking");
+          accuracyEl.textContent = (c.accuracy ? "±" + Math.round(c.accuracy) + " m" : "");
+          renderStats();
+        }
+
+        function onError(err) {
+          if (err.code === 1) { // permission denied
+            setStatus("err", "Location blocked");
+            showMsg("Location access is off",
+              "The speedometer needs your location to measure speed. Allow location for this page in your browser settings, then tap Start tracking again.");
+            stopTracking(false);
+          } else if (err.code === 3) {
+            setStatus("wait", "GPS signal is taking a while…");
+          } else {
+            setStatus("wait", "Waiting for a GPS signal…");
+          }
+        }
+
+        // ---------- wake lock ----------
+        function grabWakeLock() {
+          if ("wakeLock" in navigator) {
+            navigator.wakeLock.request("screen").then(function (lock) {
+              wakeLock = lock;
+            }).catch(function () { /* not critical */ });
+          }
+        }
+        document.addEventListener("visibilitychange", function () {
+          if (tracking && document.visibilityState === "visible") grabWakeLock();
+        });
+
+        // ---------- start / stop ----------
+        function startTracking() {
+          if (!("geolocation" in navigator)) {
+            setStatus("err", "GPS not available");
+            showMsg("No GPS on this device",
+              "This browser doesn't provide location, so speed can't be measured here. Try opening this page on your phone.");
+            return;
+          }
+          hideMsg();
+          setStatus("wait", "Waiting for a GPS signal…");
+          tracking = true;
+          toggleBtn.textContent = "Stop tracking";
+          toggleBtn.classList.add("stop");
+          if (!startTime) {
+            startTime = Date.now();
+            timerId = setInterval(renderStats, 1000);
+          }
+          watchId = navigator.geolocation.watchPosition(onPosition, onError, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 20000
+          });
+          grabWakeLock();
+        }
+        function stopTracking(resetStatus) {
+          tracking = false;
+          if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+          if (timerId) { clearInterval(timerId); timerId = null; }
+          if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+          targetKmh = 0;
+          recent = [];
+          lastFix = null;
+          toggleBtn.textContent = "Start tracking";
+          toggleBtn.classList.remove("stop");
+          if (resetStatus !== false) {
+            setStatus("", "Paused — tap Start to resume");
+            accuracyEl.textContent = "";
+          }
+        }
+
+        toggleBtn.addEventListener("click", function () {
+          if (tracking) stopTracking(true); else startTracking();
+        });
+
+        resetBtn.addEventListener("click", function () {
+          maxKmh = 0; distM = 0; speedSum = 0; speedCount = 0;
+          startTime = tracking ? Date.now() : null;
+          statTime.textContent = "0:00";
+          renderStats();
+        });
+
+        function setUnit(u) {
+          unit = u;
+          unitKmhBtn.setAttribute("aria-pressed", u === "kmh" ? "true" : "false");
+          unitMphBtn.setAttribute("aria-pressed", u === "mph" ? "true" : "false");
+          bigUnit.textContent = unitLabel();
+          drawTicks();
+          renderStats();
+        }
+        unitKmhBtn.addEventListener("click", function () { setUnit("kmh"); });
+        unitMphBtn.addEventListener("click", function () { setUnit("mph"); });
+
+        // ---------- init ----------
+        drawTicks();
+        renderStats();
+        requestAnimationFrame(animate);
+      })();
+    </script>
+  </body>
+</html>
