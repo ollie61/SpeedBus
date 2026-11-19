@@ -11,7 +11,7 @@
     <link rel="icon" type="image/svg+xml" href="speedbus-icon.svg" />
     <link rel="icon" href="data:," />
     <meta name="description" content="SpeedBus passenger-operated STM bus trip recorder">
-    <title>SpeedBus v0.2.4 — Trip Recorder</title>
+    <title>SpeedBus v0.2.5 — Trip Recorder</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -19,7 +19,7 @@
   </head>
   <body>
     <main>
-      <header class="brand"><h1>SpeedBus</h1><span class="version">TRIP RECORDER · v0.2.4</span></header>
+      <header class="brand"><h1>SpeedBus</h1><span class="version">TRIP RECORDER · v0.2.5</span></header>
       <div class="status-row">
         <span class="status" role="status" aria-live="polite"><span class="dot" id="dot"></span><span id="statusText">Ready to record a trip</span></span>
         <span class="accuracy" id="accuracy"></span>
@@ -31,11 +31,11 @@
             <input id="busRoute" type="text" inputmode="numeric" autocomplete="off" maxlength="3" placeholder="e.g. 24 or 105" required aria-required="true" />
             <span class="route-feedback loading" id="busRouteFeedback" role="status" aria-live="polite">Loading STM route directory…</span>
           </label>
-          <label for="busNumber">Bus number (optional)
-            <input id="busNumber" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 1234" />
+          <label for="busNumber">Bus number <span class="required-mark" aria-hidden="true">*</span>
+            <input id="busNumber" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 1234" required aria-required="true" />
           </label>
-          <label for="direction">Direction (optional)
-            <select id="direction">
+          <label for="direction">Direction <span class="required-mark" aria-hidden="true">*</span>
+            <select id="direction" required aria-required="true">
               <option value="">Select direction</option>
               <option value="N">N</option>
               <option value="E">E</option>
@@ -114,11 +114,11 @@
         <p class="map-status" id="mapStatus" role="status" aria-live="polite"></p>
       </section>
 
-      <p class="note">Tap <strong>START TRIP</strong> when you board and <strong>STOP TRIP</strong> when you get off. Keep this page open and your screen awake; GPS tracking may pause if the phone locks or the browser moves to the background.</p>
-      <section class="history" aria-labelledby="historyTitle">
-        <h2 id="historyTitle">Saved trips on this phone</h2>
-        <div id="tripHistory"><p class="empty-history">No saved trips yet.</p></div>
-      </section>
+      <p class="note">Enter the route, bus number and direction, then tap <strong>START TRIP</strong>. Tap <strong>STOP TRIP</strong> when you get off. If location access is blocked, the session stays open so you can test the controls, but no trip is saved without GPS readings.</p>
+      <details class="history" id="historyDisclosure" hidden>
+        <summary>Completed trips saved on this phone</summary>
+        <div id="tripHistory"></div>
+      </details>
       <p class="disclaimer">Trip records stay in this browser on this phone. GPS readings can be inaccurate and are for personal reporting only; they are not certified evidence of speeding or dangerous driving. Use the browser’s download option to save a trip report file.</p>
     </main>
 
