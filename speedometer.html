@@ -152,21 +152,78 @@
       }
       .btn-main {
         appearance: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
         border: none;
         border-radius: 14px;
-        background: var(--accent);
-        color: var(--accent-ink);
+        color: #ffffff;
         font-family: inherit;
         font-size: 1.2rem;
         font-weight: 800;
         letter-spacing: 0.02em;
-        padding: 16px 20px;
-        min-height: 60px;
+        padding: 12px 20px;
+        min-height: 64px;
         cursor: pointer;
         width: 100%;
       }
       .btn-main:active { transform: scale(0.99); }
-      .btn-main.stop { background: var(--ink); color: var(--bg); }
+      .btn-main.start { background: #18864a; }
+      .btn-main.stop { background: #c52f32; }
+      .traffic-light {
+        display: grid;
+        gap: 4px;
+        justify-items: center;
+        align-content: center;
+        width: 26px;
+        height: 40px;
+        padding: 4px;
+        border-radius: 10px;
+        background: #202426;
+        flex: none;
+      }
+      .traffic-light .lens { width: 8px; height: 8px; border-radius: 50%; background: #596064; }
+      .btn-main.start .green-lens { background: #4df17a; box-shadow: 0 0 8px #4df17a; }
+      .btn-main.stop .red-lens { background: #ff4b4b; box-shadow: 0 0 8px #ff4b4b; }
+      .required-mark { color: var(--bad); }
+      .comment-panel {
+        display: grid;
+        gap: 10px;
+        background: var(--card);
+        border: 1.5px solid var(--card-line);
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .comment-panel h2 { font-size: 1.05rem; margin: 0; }
+      .comment-panel p { margin: 0; color: var(--ink-soft); font-size: 0.9rem; line-height: 1.4; }
+      .comment-panel label { display: grid; gap: 5px; font-size: 0.88rem; font-weight: 700; color: var(--ink-soft); }
+      .comment-panel textarea {
+        width: 100%;
+        min-height: 76px;
+        resize: vertical;
+        border: 1.5px solid var(--card-line);
+        border-radius: 10px;
+        padding: 10px 11px;
+        background: var(--card);
+        color: var(--ink);
+        font: inherit;
+      }
+      .comment-panel button {
+        appearance: none;
+        border: 1.5px solid var(--card-line);
+        border-radius: 10px;
+        background: var(--bg);
+        color: var(--ink);
+        font: inherit;
+        font-weight: 700;
+        min-height: 44px;
+        cursor: pointer;
+      }
+      .comment-panel button:disabled { opacity: 0.55; cursor: not-allowed; }
+      .comment-list { display: grid; gap: 7px; margin: 0; padding-left: 22px; }
+      .comment-list li { color: var(--ink); font-size: 0.9rem; line-height: 1.4; }
+      .comment-list time { color: var(--ink-soft); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.82rem; }
       .row-btns {
         display: flex;
         gap: 12px;
@@ -299,10 +356,34 @@
   </head>
   <body>
     <main>
-      <header class="brand"><h1>SpeedBus</h1><span class="version">TRIP RECORDER · v0.2.1</span></header>
+      <header class="brand"><h1>SpeedBus</h1><span class="version">TRIP RECORDER · v0.2.2</span></header>
       <div class="status-row">
         <span class="status" role="status" aria-live="polite"><span class="dot" id="dot"></span><span id="statusText">Ready to record a trip</span></span>
         <span class="accuracy" id="accuracy"></span>
+      </div>
+
+      <div class="controls">
+        <div class="trip-info">
+          <label for="busRoute">Bus route <span class="required-mark" aria-hidden="true">*</span>
+            <input id="busRoute" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 24 or 105" required aria-required="true" />
+          </label>
+          <label for="busNumber">Bus number (optional)
+            <input id="busNumber" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 1234" />
+          </label>
+          <label for="direction">Direction (optional)
+            <select id="direction">
+              <option value="">Select direction</option>
+              <option value="N">N</option>
+              <option value="E">E</option>
+              <option value="W">W</option>
+              <option value="S">S</option>
+            </select>
+          </label>
+        </div>
+        <button class="btn-main start" id="toggleBtn" type="button" aria-label="Start trip">
+          <span class="traffic-light" aria-hidden="true"><span class="lens red-lens"></span><span class="lens yellow-lens"></span><span class="lens green-lens"></span></span>
+          <span id="toggleBtnLabel">START TRIP</span>
+        </button>
       </div>
 
       <div class="dial-wrap">
@@ -324,27 +405,6 @@
       </div>
 
       <div class="msg" id="msg" role="alert"></div>
-
-      <div class="controls">
-        <div class="trip-info">
-          <label for="busRoute">Bus route (optional)
-            <input id="busRoute" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 24 or 105" />
-          </label>
-          <label for="busNumber">Bus number (optional)
-            <input id="busNumber" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 1234" />
-          </label>
-          <label for="direction">Direction (optional)
-            <select id="direction">
-              <option value="">Select direction</option>
-              <option value="N">N</option>
-              <option value="E">E</option>
-              <option value="W">W</option>
-              <option value="S">S</option>
-            </select>
-          </label>
-        </div>
-        <button class="btn-main" id="toggleBtn" type="button">START TRIP</button>
-      </div>
 
       <section class="stats" aria-label="Trip statistics">
         <div class="stat">
@@ -371,6 +431,16 @@
           <div class="label">Idle time</div>
           <div class="value"><span id="statIdle">0:00</span></div>
         </div>
+      </section>
+
+      <section class="comment-panel" aria-labelledby="commentTitle">
+        <h2 id="commentTitle">Trip comments</h2>
+        <p>Add notes while the trip is recording. Each comment gets a time stamp and is included in the saved trip.</p>
+        <label for="tripComment">Comment
+          <textarea id="tripComment" maxlength="500" placeholder="e.g. Bus stopped suddenly, rough braking, or location detail" disabled></textarea>
+        </label>
+        <button id="addCommentBtn" type="button" disabled>Add comment</button>
+        <ol class="comment-list" id="commentList" aria-live="polite"></ol>
       </section>
 
       <section class="map-panel" id="mapPanel" aria-labelledby="mapTitle" hidden>
@@ -437,6 +507,10 @@
         var needleGroup = document.getElementById("needleGroup");
         var ticksG = document.getElementById("ticks");
         var toggleBtn = document.getElementById("toggleBtn");
+        var toggleBtnLabel = document.getElementById("toggleBtnLabel");
+        var tripCommentInput = document.getElementById("tripComment");
+        var addCommentBtn = document.getElementById("addCommentBtn");
+        var commentList = document.getElementById("commentList");
         var msg = document.getElementById("msg");
         var statMax = document.getElementById("statMax");
         var statAvg = document.getElementById("statAvg");
@@ -704,6 +778,12 @@
 
         // ---------- start / stop ----------
         function startTracking() {
+          var route = busRouteInput.value.trim();
+          if (!route) {
+            showMsg("Bus route required", "Enter the bus route before starting a trip.");
+            busRouteInput.focus();
+            return;
+          }
           if (!("geolocation" in navigator)) {
             setStatus("err", "GPS not available");
             showMsg("No GPS on this device",
@@ -713,12 +793,20 @@
           hideMsg();
           if (!trip) {
             maxKmh = 0; distM = 0; brakeCount = 0; lastBrakeAt = 0; recent = []; displayedTrip = null;
-            trip = { id: "trip-" + Date.now(), startedAt: Date.now(), stoppedAt: null, busRoute: busRouteInput.value.trim() || null, busNumber: busNumberInput.value.trim() || null, direction: directionInput.value || null, distanceM: 0, maxSpeedKmh: 0, idleTimeMs: 0, isIdle: false, lastSpeedSampleAt: null, possibleHardBrakingEvents: 0, brakingEvents: [], observations: [], complete: false, interrupted: false };
+            trip = { id: "trip-" + Date.now(), startedAt: Date.now(), stoppedAt: null, busRoute: route, busNumber: busNumberInput.value.trim() || null, direction: directionInput.value || null, distanceM: 0, maxSpeedKmh: 0, idleTimeMs: 0, isIdle: false, lastSpeedSampleAt: null, possibleHardBrakingEvents: 0, brakingEvents: [], observations: [], comments: [], complete: false, interrupted: false };
           }
           setStatus("wait", "Waiting for a GPS signal…");
           tracking = true;
-          toggleBtn.textContent = "STOP TRIP";
+          toggleBtnLabel.textContent = "STOP TRIP";
+          toggleBtn.classList.remove("start");
           toggleBtn.classList.add("stop");
+          toggleBtn.setAttribute("aria-label", "Stop trip");
+          busRouteInput.disabled = true;
+          busNumberInput.disabled = true;
+          directionInput.disabled = true;
+          tripCommentInput.disabled = false;
+          addCommentBtn.disabled = false;
+          renderComments();
           timerId = setInterval(function () { renderStats(); saveActive(); }, 5000);
           saveActive();
           watchId = navigator.geolocation.watchPosition(onPosition, onError, {
@@ -762,12 +850,54 @@
             try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
           }
           trip = null;
-          toggleBtn.textContent = "START TRIP";
+          toggleBtnLabel.textContent = "START TRIP";
           toggleBtn.classList.remove("stop");
+          toggleBtn.classList.add("start");
+          toggleBtn.setAttribute("aria-label", "Start trip");
+          busRouteInput.disabled = false;
+          busNumberInput.disabled = false;
+          directionInput.disabled = false;
+          tripCommentInput.disabled = true;
+          addCommentBtn.disabled = true;
+          renderComments();
           accuracyEl.textContent = "";
           renderStats(); renderHistory();
           setStatus(interrupted || !tripSaved ? "wait" : "", !tripSaved ? "Trip kept for recovery — phone storage is full" : (showStatus || (interrupted ? "Trip saved — GPS tracking was interrupted" : "Trip saved on this phone")));
         }
+
+        function renderComments() {
+          var current = trip || displayedTrip;
+          var comments = current && Array.isArray(current.comments) ? current.comments : [];
+          commentList.innerHTML = "";
+          comments.forEach(function (comment) {
+            var item = document.createElement("li");
+            var time = document.createElement("time");
+            time.dateTime = comment.timestamp || "";
+            time.textContent = fmtTime(comment.elapsedMs || 0) + " — ";
+            item.appendChild(time);
+            item.appendChild(document.createTextNode(comment.text || ""));
+            commentList.appendChild(item);
+          });
+        }
+
+        function addTripComment() {
+          if (!tracking || !trip) return;
+          var text = tripCommentInput.value.trim();
+          if (!text) { tripCommentInput.focus(); return; }
+          if (!Array.isArray(trip.comments)) trip.comments = [];
+          var comment = { timestamp: new Date().toISOString(), elapsedMs: Math.max(0, Date.now() - trip.startedAt), text: text };
+          if (lastFix) { comment.latitude = lastFix.lat; comment.longitude = lastFix.lon; }
+          trip.comments.push(comment);
+          tripCommentInput.value = "";
+          saveActive();
+          renderComments();
+          tripCommentInput.focus();
+        }
+
+        addCommentBtn.addEventListener("click", addTripComment);
+        tripCommentInput.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) addTripComment();
+        });
 
         toggleBtn.addEventListener("click", function () {
           if (tracking) finishTrip(false, null, "Trip saved on this phone"); else startTracking();
@@ -1042,6 +1172,7 @@
         }
         drawTicks();
         renderHistory();
+        renderComments();
         renderStats();
         requestAnimationFrame(animate);
       })();
