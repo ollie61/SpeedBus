@@ -561,8 +561,13 @@
           catch (e) { showMsg("Phone storage is full", "This trip could not be saved locally. Download or remove older saved trips after stopping."); }
         }
         function saveTrips() {
-          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedTrips.slice(0, 30))); }
-          catch (e) { showMsg("Phone storage is full", "The trip summary could not be saved. Download the trip report if it is still shown below."); }
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(savedTrips.slice(0, 30)));
+            return true;
+          } catch (e) {
+            showMsg("Phone storage is full", "The trip summary could not be saved. The active recovery copy will be kept until you can download or clear space for the trip.");
+            return false;
+          }
         }
         function addObservation(observation) {
           if (!trip) return;
@@ -752,14 +757,16 @@
           displayedTrip = trip;
           savedTrips.unshift(trip);
           savedTrips = savedTrips.slice(0, 30);
-          saveTrips();
-          try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
+          var tripSaved = saveTrips();
+          if (tripSaved) {
+            try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
+          }
           trip = null;
           toggleBtn.textContent = "START TRIP";
           toggleBtn.classList.remove("stop");
           accuracyEl.textContent = "";
           renderStats(); renderHistory();
-          setStatus(interrupted ? "wait" : "", showStatus || (interrupted ? "Trip saved — GPS tracking was interrupted" : "Trip saved on this phone"));
+          setStatus(interrupted || !tripSaved ? "wait" : "", showStatus || (!tripSaved ? "Trip kept for recovery — phone storage is full" : (interrupted ? "Trip saved — GPS tracking was interrupted" : "Trip saved on this phone")));
         }
 
         toggleBtn.addEventListener("click", function () {
@@ -1020,11 +1027,18 @@
           recovered.idleTimeMs = Number(recovered.idleTimeMs || 0);
           var recoveredMovingMs = Math.max(0, recovered.elapsedMs - recovered.idleTimeMs);
           recovered.averageSpeedKmh = recoveredMovingMs > 0 ? (recovered.distanceM / 1000) / (recoveredMovingMs / 3600000) : 0;
-          savedTrips.unshift(recovered); savedTrips = savedTrips.slice(0, 30); saveTrips();
+          var alreadyRecovered = savedTrips.some(function (saved) { return saved.id && saved.id === recovered.id; });
+          if (!alreadyRecovered) savedTrips.unshift(recovered);
+          savedTrips = savedTrips.slice(0, 30);
+          var recoverySaved = saveTrips();
           displayedTrip = recovered;
           maxKmh = Number(recovered.maxSpeedKmh || 0); distM = Number(recovered.distanceM || 0); brakeCount = Number(recovered.possibleHardBrakingEvents || 0);
-          try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
-          setStatus("wait", "Previous trip saved — tracking was interrupted");
+          if (recoverySaved) {
+            try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
+            setStatus("wait", "Previous trip saved — tracking was interrupted");
+          } else {
+            setStatus("wait", "Recovered trip is still available — download it to keep a copy");
+          }
         }
         drawTicks();
         renderHistory();
