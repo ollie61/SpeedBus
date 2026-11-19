@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#171a16"/>
+  <circle cx="256" cy="256" r="170" fill="#eceee9" stroke="#1d8a4e" stroke-width="24"/>
+  <path d="M126 314a142 142 0 0 1 260 0" fill="none" stroke="#4c534b" stroke-width="20" stroke-linecap="round"/>
+  <path d="M256 256 354 168" stroke="#e8490f" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="20" fill="#171a16"/>
+  <text x="256" y="390" fill="#171a16" font-family="Arial,sans-serif" font-size="64" font-weight="700" text-anchor="middle">km/h</text>
+</svg>
