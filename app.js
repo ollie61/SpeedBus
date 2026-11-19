@@ -58,6 +58,7 @@
         var statBrakes = document.getElementById("statBrakes");
         var statIdle = document.getElementById("statIdle");
         var tripHistory = document.getElementById("tripHistory");
+        var historyDisclosure = document.getElementById("historyDisclosure");
         var mapPanel = document.getElementById("mapPanel");
         var tripMapEl = document.getElementById("tripMap");
         var mapStatus = document.getElementById("mapStatus");
@@ -341,8 +342,8 @@
         function onError(err) {
           if (err.code === 1) {
             setStatus("err", "Location access blocked");
-            showMsg("Allow location access", "SpeedBus needs your phone’s location while recording. Enable location access for this page in your browser, then start the trip again.");
-            finishTrip(true, "Location permission was denied", true);
+            accuracyEl.textContent = "";
+            showMsg("Location access blocked", "The trip stays open so you can test the controls. Speed and GPS data are not being recorded. Enable location for SpeedBus, then stop this session and start a new trip to retry.");
           } else if (err.code === 3) {
             setStatus("wait", "GPS unavailable — waiting for a location fix");
           } else {
@@ -390,18 +391,23 @@
           }
           route = routeChoice.number;
           busRouteInput.value = route;
-          if (!("geolocation" in navigator)) {
-            setStatus("err", "GPS not available");
-            showMsg("No GPS on this device",
-              "This browser doesn't provide location, so speed can't be measured here. Try opening this page on your phone.");
+          if (!busNumberInput.value.trim()) {
+            showMsg("Bus number required", "Enter the bus number before starting.");
+            busNumberInput.focus();
             return;
           }
+          if (!directionInput.value) {
+            showMsg("Direction required", "Select N, E, W, or S before starting.");
+            directionInput.focus();
+            return;
+          }
+          var canTrackLocation = "geolocation" in navigator;
           hideMsg();
           if (!trip) {
             maxKmh = 0; distM = 0; brakeCount = 0; lastBrakeAt = 0; recent = []; displayedTrip = null;
             trip = { id: "trip-" + Date.now(), startedAt: Date.now(), stoppedAt: null, busRoute: route, busRouteName: routeChoice.name, busNumber: busNumberInput.value.trim() || null, direction: directionInput.value || null, distanceM: 0, maxSpeedKmh: 0, idleTimeMs: 0, isIdle: false, lastSpeedSampleAt: null, possibleHardBrakingEvents: 0, brakingEvents: [], observations: [], comments: [], complete: false, interrupted: false };
           }
-          setStatus("wait", "Waiting for a GPS signal…");
+          setStatus(canTrackLocation ? "wait" : "err", canTrackLocation ? "Waiting for a GPS signal…" : "GPS not available");
           tracking = true;
           toggleBtnLabel.textContent = "STOP TRIP";
           toggleBtn.classList.remove("start");
@@ -415,12 +421,20 @@
           renderComments();
           timerId = setInterval(function () { renderStats(); saveActive(); }, 5000);
           saveActive();
-          watchId = navigator.geolocation.watchPosition(onPosition, onError, {
-            enableHighAccuracy: true,
-            maximumAge: 1000,
-            timeout: 15000
-          });
-          grabWakeLock();
+          if (canTrackLocation) {
+            try {
+              watchId = navigator.geolocation.watchPosition(onPosition, onError, {
+                enableHighAccuracy: true,
+                maximumAge: 1000,
+                timeout: 15000
+              });
+              grabWakeLock();
+            } catch (error) {
+              onError({ code: 1 });
+            }
+          } else {
+            showMsg("GPS not available", "The trip stays open so you can test the controls. Speed and GPS data are not being recorded.");
+          }
         }
         function finishTrip(interrupted, reason, showStatus) {
           if (!trip) return;
@@ -448,11 +462,18 @@
           trip.interruptionReason = reason || null;
           delete trip.lastAcceptedSpeed;
           delete trip.lastVisibleAt;
-          displayedTrip = trip;
-          savedTrips.unshift(trip);
-          savedTrips = savedTrips.slice(0, 30);
-          var tripSaved = saveTrips();
-          if (tripSaved) {
+          var hasGpsReadings = Array.isArray(trip.observations) && trip.observations.length > 0;
+          var tripSaved = true;
+          if (hasGpsReadings) {
+            displayedTrip = trip;
+            savedTrips.unshift(trip);
+            savedTrips = savedTrips.slice(0, 30);
+            tripSaved = saveTrips();
+            if (tripSaved) {
+              try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
+            }
+          } else {
+            displayedTrip = null;
             try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
           }
           trip = null;
@@ -468,6 +489,11 @@
           renderComments();
           accuracyEl.textContent = "";
           renderStats(); renderHistory();
+          if (!hasGpsReadings) {
+            setStatus("wait", "Trip ended — no GPS readings; nothing was saved");
+            if (!interrupted) showMsg("No GPS readings recorded", "This session was not saved as a trip. Allow location access before your next ride to record speed and route data.");
+            return;
+          }
           setStatus(interrupted || !tripSaved ? "wait" : "", !tripSaved ? "Trip kept for recovery — phone storage is full" : (showStatus || (interrupted ? "Trip saved — GPS tracking was interrupted" : "Trip saved on this phone")));
         }
 
@@ -509,10 +535,16 @@
           if (tracking) finishTrip(false, null, "Trip saved on this phone"); else startTracking();
         });
 
+        function isDisplayableTrip(saved) {
+          return !!saved && saved.interrupted !== true && saved.complete !== false &&
+            Array.isArray(saved.observations) && saved.observations.length > 0;
+        }
         function renderHistory() {
-          if (!savedTrips.length) { tripHistory.innerHTML = '<p class="empty-history">No saved trips yet.</p>'; return; }
+          var displayableTrips = savedTrips.filter(isDisplayableTrip);
+          if (!displayableTrips.length) { tripHistory.innerHTML = ""; historyDisclosure.hidden = true; return; }
+          historyDisclosure.hidden = false;
           tripHistory.innerHTML = "";
-          savedTrips.forEach(function (saved, index) {
+          displayableTrips.forEach(function (saved, index) {
             var card = document.createElement("article");
             card.className = "trip-card";
             var title = document.createElement("strong");
@@ -745,12 +777,10 @@
         // ---------- init ----------
         savedTrips = storageRead(STORAGE_KEY, []);
         if (!Array.isArray(savedTrips)) savedTrips = [];
-        if (savedTrips.length) {
-          displayedTrip = savedTrips[0];
-          maxKmh = Number(displayedTrip.maxSpeedKmh || 0);
-          distM = Number(displayedTrip.distanceM || 0);
-          brakeCount = Number(displayedTrip.possibleHardBrakingEvents || 0);
-        }
+        displayedTrip = null;
+        maxKmh = 0;
+        distM = 0;
+        brakeCount = 0;
         var recovered = storageRead(ACTIVE_KEY, null);
         if (recovered && recovered.startedAt) {
           var recoveredEnd = recovered.observations && recovered.observations.length ? Date.parse(recovered.observations[recovered.observations.length - 1].timestamp) : recovered.startedAt;
@@ -764,17 +794,10 @@
           var recoveredMovingMs = Math.max(0, recovered.elapsedMs - recovered.idleTimeMs);
           recovered.averageSpeedKmh = recoveredMovingMs > 0 ? (recovered.distanceM / 1000) / (recoveredMovingMs / 3600000) : 0;
           var alreadyRecovered = savedTrips.some(function (saved) { return saved.id && saved.id === recovered.id; });
-          if (!alreadyRecovered) savedTrips.unshift(recovered);
+          if (recovered.observations && recovered.observations.length && !alreadyRecovered) savedTrips.unshift(recovered);
           savedTrips = savedTrips.slice(0, 30);
-          var recoverySaved = saveTrips();
-          displayedTrip = recovered;
-          maxKmh = Number(recovered.maxSpeedKmh || 0); distM = Number(recovered.distanceM || 0); brakeCount = Number(recovered.possibleHardBrakingEvents || 0);
-          if (recoverySaved) {
-            try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
-            setStatus("wait", "Previous trip saved — tracking was interrupted");
-          } else {
-            setStatus("wait", "Recovered trip is still available — download it to keep a copy");
-          }
+          if (recovered.observations && recovered.observations.length) saveTrips();
+          try { localStorage.removeItem(ACTIVE_KEY); } catch (e) {}
         }
         drawTicks();
         renderHistory();
