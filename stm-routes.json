@@ -1,0 +1,711 @@
+{
+  "schemaVersion": 1,
+  "agency": "Société de transport de Montréal (STM)",
+  "retrievedOn": "2026-11-19",
+  "source": "https://www.stm.info/en/schedules-and-routes/bus",
+  "attribution": "Route numbers and public route names from the STM bus directory.",
+  "routes": {
+    "10": {
+      "name": "De Lorimier"
+    },
+    "11": {
+      "name": "Parc-du-Mont-Royal"
+    },
+    "12": {
+      "name": "Île-des-Soeurs"
+    },
+    "13": {
+      "name": "Christophe-Colomb"
+    },
+    "14": {
+      "name": "Atateken"
+    },
+    "16": {
+      "name": "Graham"
+    },
+    "17": {
+      "name": "Décarie"
+    },
+    "18": {
+      "name": "Beaubien"
+    },
+    "20": {
+      "name": "Crémazie / Marché Central"
+    },
+    "22": {
+      "name": "Notre-Dame"
+    },
+    "24": {
+      "name": "Sherbrooke"
+    },
+    "25": {
+      "name": "Angus"
+    },
+    "26": {
+      "name": "Mercier-Est"
+    },
+    "27": {
+      "name": "Saint-Joseph"
+    },
+    "28": {
+      "name": "Honoré-Beaugrand"
+    },
+    "29": {
+      "name": "Rachel"
+    },
+    "31": {
+      "name": "Saint-Denis"
+    },
+    "32": {
+      "name": "Lacordaire"
+    },
+    "33": {
+      "name": "Langelier"
+    },
+    "34": {
+      "name": "Sainte-Catherine"
+    },
+    "35": {
+      "name": "Griffintown"
+    },
+    "36": {
+      "name": "Monk"
+    },
+    "37": {
+      "name": "Jolicoeur"
+    },
+    "38": {
+      "name": "De l'Église"
+    },
+    "39": {
+      "name": "Des Grandes-Prairies"
+    },
+    "40": {
+      "name": "Henri-Bourassa-Est"
+    },
+    "41": {
+      "name": "Saint-Michel / Ahuntsic"
+    },
+    "43": {
+      "name": "Monselet"
+    },
+    "44": {
+      "name": "Armand-Bombardier"
+    },
+    "45": {
+      "name": "Papineau"
+    },
+    "47": {
+      "name": "Masson"
+    },
+    "48": {
+      "name": "Perras"
+    },
+    "49": {
+      "name": "Maurice-Duplessis"
+    },
+    "50": {
+      "name": "Vieux-Montréal / Vieux-Port"
+    },
+    "51": {
+      "name": "Édouard-Montpetit"
+    },
+    "52": {
+      "name": "De Liège"
+    },
+    "54": {
+      "name": "Charland / Chabanel"
+    },
+    "55": {
+      "name": "Saint-Laurent"
+    },
+    "56": {
+      "name": "St-Hubert"
+    },
+    "57": {
+      "name": "Charlevoix"
+    },
+    "61": {
+      "name": "Wellington"
+    },
+    "63": {
+      "name": "Girouard"
+    },
+    "64": {
+      "name": "Grenet"
+    },
+    "66": {
+      "name": "The Boulevard"
+    },
+    "67": {
+      "name": "Saint-Michel"
+    },
+    "68": {
+      "name": "Pierrefonds"
+    },
+    "69": {
+      "name": "Henri-Bourassa"
+    },
+    "70": {
+      "name": "Poirier"
+    },
+    "71": {
+      "name": "Pointe-Saint-Charles"
+    },
+    "72": {
+      "name": "Alfred-Nobel"
+    },
+    "73": {
+      "name": "Dalton"
+    },
+    "74": {
+      "name": "Bridge"
+    },
+    "79": {
+      "name": "Gouin"
+    },
+    "80": {
+      "name": "Du Parc"
+    },
+    "81": {
+      "name": "Saint-Jean-Baptiste"
+    },
+    "85": {
+      "name": "Hochelaga"
+    },
+    "86": {
+      "name": "Pointe-aux-Trembles"
+    },
+    "90": {
+      "name": "Saint-Jacques"
+    },
+    "92": {
+      "name": "Jean-Talon Ouest"
+    },
+    "93": {
+      "name": "Jean-Talon"
+    },
+    "94": {
+      "name": "D'Iberville"
+    },
+    "95": {
+      "name": "Bélanger"
+    },
+    "97": {
+      "name": "Avenue-du-Mont-Royal"
+    },
+    "99": {
+      "name": "Villeray"
+    },
+    "100": {
+      "name": "Crémazie"
+    },
+    "101": {
+      "name": "Saint-Patrick"
+    },
+    "102": {
+      "name": "Somerled"
+    },
+    "103": {
+      "name": "Monkland"
+    },
+    "104": {
+      "name": "Cavendish"
+    },
+    "105": {
+      "name": "Sherbrooke"
+    },
+    "106": {
+      "name": "Newman"
+    },
+    "107": {
+      "name": "Verdun"
+    },
+    "108": {
+      "name": "Bannantyne"
+    },
+    "110": {
+      "name": "Centrale"
+    },
+    "112": {
+      "name": "Airlie"
+    },
+    "113": {
+      "name": "Lapierre"
+    },
+    "114": {
+      "name": "Angrignon"
+    },
+    "117": {
+      "name": "O'Brien"
+    },
+    "119": {
+      "name": "Rockland"
+    },
+    "120": {
+      "name": "Royalmount"
+    },
+    "121": {
+      "name": "Sauvé / Côte-Vertu"
+    },
+    "123": {
+      "name": "Dollard / Shevchenko"
+    },
+    "124": {
+      "name": "Victoria"
+    },
+    "125": {
+      "name": "Ontario"
+    },
+    "127": {
+      "name": "Alexis-Nihon"
+    },
+    "128": {
+      "name": "Saint-Laurent"
+    },
+    "129": {
+      "name": "Côte-Sainte-Catherine"
+    },
+    "131": {
+      "name": "De l'Assomption"
+    },
+    "136": {
+      "name": "Viau"
+    },
+    "138": {
+      "name": "Notre-Dame-de-Grâce"
+    },
+    "139": {
+      "name": "Pie-IX"
+    },
+    "140": {
+      "name": "Fleury"
+    },
+    "141": {
+      "name": "Jean-Talon Est"
+    },
+    "144": {
+      "name": "Des Pins"
+    },
+    "150": {
+      "name": "René-Lévesque"
+    },
+    "155": {
+      "name": "Wilderton"
+    },
+    "160": {
+      "name": "Barclay"
+    },
+    "161": {
+      "name": "Van Horne"
+    },
+    "164": {
+      "name": "Dudemaine"
+    },
+    "165": {
+      "name": "Côte-des-Neiges"
+    },
+    "166": {
+      "name": "Queen-Mary"
+    },
+    "168": {
+      "name": "Cité-du-Havre"
+    },
+    "170": {
+      "name": "Keller"
+    },
+    "171": {
+      "name": "Henri-Bourassa"
+    },
+    "172": {
+      "name": "Du Golf"
+    },
+    "174": {
+      "name": "Côte-Vertu"
+    },
+    "175": {
+      "name": "Griffith"
+    },
+    "176": {
+      "name": "Berlioz"
+    },
+    "177": {
+      "name": "Thimens"
+    },
+    "179": {
+      "name": "De l'Acadie"
+    },
+    "180": {
+      "name": "De Salaberry"
+    },
+    "183": {
+      "name": "Gouin-Est"
+    },
+    "185": {
+      "name": "Sherbrooke"
+    },
+    "186": {
+      "name": "Sherbrooke-Est"
+    },
+    "187": {
+      "name": "René-Lévesque"
+    },
+    "188": {
+      "name": "Couture"
+    },
+    "189": {
+      "name": "Notre-Dame"
+    },
+    "190": {
+      "name": "Norman"
+    },
+    "192": {
+      "name": "Robert"
+    },
+    "193": {
+      "name": "Jarry"
+    },
+    "195": {
+      "name": "Dorval / Angrignon"
+    },
+    "196": {
+      "name": "Parc-Industriel-Lachine"
+    },
+    "197": {
+      "name": "Rosemont"
+    },
+    "198": {
+      "name": "Broadway"
+    },
+    "200": {
+      "name": "Sainte-Anne-de-Bellevue"
+    },
+    "201": {
+      "name": "Saint-Charles"
+    },
+    "202": {
+      "name": "Dawson"
+    },
+    "203": {
+      "name": "Carson"
+    },
+    "204": {
+      "name": "Cardinal"
+    },
+    "205": {
+      "name": "Gouin"
+    },
+    "206": {
+      "name": "Roger-Pilon"
+    },
+    "207": {
+      "name": "Jacques-Bizard"
+    },
+    "208": {
+      "name": "Brunswick"
+    },
+    "209": {
+      "name": "Des Sources / YUL Aéroport"
+    },
+    "210": {
+      "name": "John-Abbott"
+    },
+    "211": {
+      "name": "Bord-du-Lac"
+    },
+    "212": {
+      "name": "Sainte-Anne"
+    },
+    "214": {
+      "name": "Stuart-Graham / YUL Aéroport"
+    },
+    "215": {
+      "name": "Henri-Bourassa / Brunswick"
+    },
+    "216": {
+      "name": "Transcanadienne"
+    },
+    "218": {
+      "name": "Antoine-Faucon"
+    },
+    "220": {
+      "name": "Kieran"
+    },
+    "221": {
+      "name": "Saint-Jean"
+    },
+    "222": {
+      "name": "Senneville"
+    },
+    "223": {
+      "name": "Parc-industriel Baie-d'Urfé"
+    },
+    "225": {
+      "name": "Hymus"
+    },
+    "227": {
+      "name": "Île-Bizard"
+    },
+    "229": {
+      "name": "Transcanadienne / Brunswick"
+    },
+    "230": {
+      "name": "Saint-Louis"
+    },
+    "270": {
+      "name": "Pointe-Claire"
+    },
+    "271": {
+      "name": "Dorval"
+    },
+    "272": {
+      "name": "Île-des-Sœurs"
+    },
+    "281": {
+      "name": "Senneville / Sainte-Anne-de-Bellevue"
+    },
+    "282": {
+      "name": "Côte-Vertu"
+    },
+    "283": {
+      "name": "Technoparc-Montréal"
+    },
+    "284": {
+      "name": "Baie-D'Urfé"
+    },
+    "285": {
+      "name": "Rivière-des-Prairies"
+    },
+    "287": {
+      "name": "Lachine-Ouest"
+    },
+    "288": {
+      "name": "Parc industriel Anjou"
+    },
+    "289": {
+      "name": "Pointe-aux-Prairies"
+    },
+    "290": {
+      "name": "Île-Bizard"
+    },
+    "292": {
+      "name": "Parc Jean-Drapeau"
+    },
+    "293": {
+      "name": "Parc industriel Dorval / Lachine"
+    },
+    "294": {
+      "name": "Parc industriel Baie-d'Urfé"
+    },
+    "295": {
+      "name": "Beaurepaire"
+    },
+    "350": {
+      "name": "Verdun / LaSalle"
+    },
+    "353": {
+      "name": "Lacordaire / Maurice-Duplessis"
+    },
+    "354": {
+      "name": "Sainte-Anne-de-Bellevue / Centre-ville"
+    },
+    "355": {
+      "name": "Pie-IX"
+    },
+    "356": {
+      "name": "Lachine / YUL Aéroport / Des Sources"
+    },
+    "357": {
+      "name": "Saint-Michel"
+    },
+    "358": {
+      "name": "René-Lévesque"
+    },
+    "359": {
+      "name": "Papineau"
+    },
+    "360": {
+      "name": "Av. des Pins"
+    },
+    "361": {
+      "name": "Saint-Denis"
+    },
+    "362": {
+      "name": "Hochelaga / Notre-Dame"
+    },
+    "363": {
+      "name": "Saint-Laurent"
+    },
+    "364": {
+      "name": "Sherbrooke / Joseph-Renaud"
+    },
+    "365": {
+      "name": "Du Parc"
+    },
+    "368": {
+      "name": "Avenue-du-Mont-Royal"
+    },
+    "369": {
+      "name": "Côte-des-Neiges"
+    },
+    "370": {
+      "name": "Rosemont"
+    },
+    "371": {
+      "name": "Décarie"
+    },
+    "372": {
+      "name": "Jean-Talon"
+    },
+    "376": {
+      "name": "Pierrefonds / Centre-ville"
+    },
+    "378": {
+      "name": "Sauvé / YUL Aéroport"
+    },
+    "380": {
+      "name": "Henri-Bourassa"
+    },
+    "382": {
+      "name": "Pierrefonds / Saint-Charles"
+    },
+    "410": {
+      "name": "Express Notre-Dame"
+    },
+    "411": {
+      "name": "Express Lionel-Groulx"
+    },
+    "420": {
+      "name": "Express Notre-Dame-de-Grâce"
+    },
+    "428": {
+      "name": "Express Parcs industriels de l'Est"
+    },
+    "430": {
+      "name": "Express Pointe-aux-Trembles"
+    },
+    "432": {
+      "name": "Express Lacordaire"
+    },
+    "439": {
+      "name": "Express Pie-IX"
+    },
+    "440": {
+      "name": "Express Charleroi"
+    },
+    "444": {
+      "name": "Express Cégep Marie-Victorin"
+    },
+    "445": {
+      "name": "Express Papineau"
+    },
+    "448": {
+      "name": "Express Maurice-Duplessis"
+    },
+    "449": {
+      "name": "Express Rivière-des-Prairies"
+    },
+    "460": {
+      "name": "Express Métropolitaine"
+    },
+    "467": {
+      "name": "Express Saint-Michel"
+    },
+    "468": {
+      "name": "Express Pierrefonds / Gouin"
+    },
+    "469": {
+      "name": "Express Henri-Bourassa"
+    },
+    "470": {
+      "name": "Express Pierrefonds"
+    },
+    "475": {
+      "name": "Express Dollard-des-Ormeaux"
+    },
+    "480": {
+      "name": "Express du Parc"
+    },
+    "486": {
+      "name": "Express Sherbrooke"
+    },
+    "487": {
+      "name": "Express Bout-de-l'Île"
+    },
+    "491": {
+      "name": "Express Provost"
+    },
+    "496": {
+      "name": "Express Victoria"
+    },
+    "505": {
+      "name": "Navette spéciale ligne 5 - Bleue"
+    },
+    "521": {
+      "name": "REM Anse-à-l'Orme / Côte-Vertu"
+    },
+    "522": {
+      "name": "REM Bois-Franc / Du Collège"
+    },
+    "523": {
+      "name": "REM Anse-à-l’Orme / Fairview-Pointe-Claire"
+    },
+    "524": {
+      "name": "REM Anse-à-l’Orme / Bois-Franc"
+    },
+    "525": {
+      "name": "REM Anse-à-l’Orme / Côte-Vertu"
+    },
+    "526": {
+      "name": "REM Côte-de-Liesse / Du Collège"
+    },
+    "527": {
+      "name": "REM Côte-de-Liesse / Bois-Franc"
+    },
+    "528": {
+      "name": "REM Fairview-Pointe-Claire / Côte-Vertu"
+    },
+    "568": {
+      "name": "REM Île-des-Soeurs / Gare Centrale"
+    },
+    "711": {
+      "name": "Parc-du-Mont-Royal / Oratoire"
+    },
+    "720": {
+      "name": "Omnium Tennis"
+    },
+    "730": {
+      "name": "Alouettes"
+    },
+    "747": {
+      "name": "YUL Aéroport Montréal-Trudeau"
+    },
+    "767": {
+      "name": "La Ronde / Station Jean-Drapeau"
+    },
+    "768": {
+      "name": "Plage-Jean-Doré"
+    },
+    "769": {
+      "name": "La Ronde / Station Papineau"
+    },
+    "777": {
+      "name": "Jean-Drapeau / Casino / Bonaventure"
+    },
+    "804": {
+      "name": "Belvédère Kondiaronk"
+    },
+    "811": {
+      "name": "Navette Services santé"
+    },
+    "814": {
+      "name": "Jean-Talon Est / Bélanger"
+    },
+    "822": {
+      "name": "Navette de Longue-Pointe"
+    },
+    "872": {
+      "name": "Île-des-Soeurs"
+    }
+  }
+}
