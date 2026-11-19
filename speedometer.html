@@ -49,7 +49,7 @@
       }
 
       * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; }
+      html, body { margin: 0; padding: 0; overscroll-behavior-y: none; }
       body {
         font-family: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
         background: linear-gradient(180deg, var(--bg) 0%, var(--bg-grad) 100%);
@@ -284,7 +284,7 @@
       }
       .trip-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
       .trip-info label { display: grid; gap: 5px; font-size: 0.82rem; font-weight: 700; color: var(--ink-soft); }
-      .trip-info input { width: 100%; border: 1.5px solid var(--card-line); border-radius: 10px; padding: 10px 11px; background: var(--card); color: var(--ink); font: inherit; }
+      .trip-info input, .trip-info select { width: 100%; border: 1.5px solid var(--card-line); border-radius: 10px; padding: 10px 11px; background: var(--card); color: var(--ink); font: inherit; }
       @media (max-width: 360px) { .trip-info { grid-template-columns: 1fr; } }
       .empty-history { color: var(--ink-soft); margin: 0; font-size: 0.92rem; }
       .disclaimer { font-size: 0.84rem; line-height: 1.5; color: var(--ink-soft); margin: 0; }
@@ -321,11 +321,20 @@
 
       <div class="controls">
         <div class="trip-info">
-          <label for="busNumber">Bus number / ID (optional)
-            <input id="busNumber" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 1234 or fleet ID" />
+          <label for="busRoute">Bus route (optional)
+            <input id="busRoute" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 24 or 105" />
+          </label>
+          <label for="busNumber">Bus number (optional)
+            <input id="busNumber" type="text" autocomplete="off" maxlength="40" placeholder="e.g. 1234" />
           </label>
           <label for="direction">Direction (optional)
-            <input id="direction" type="text" autocomplete="off" maxlength="60" placeholder="e.g. toward downtown" />
+            <select id="direction">
+              <option value="">Select direction</option>
+              <option value="N">N</option>
+              <option value="E">E</option>
+              <option value="W">W</option>
+              <option value="S">S</option>
+            </select>
           </label>
         </div>
         <button class="btn-main" id="toggleBtn" type="button">START TRIP</button>
@@ -351,6 +360,10 @@
         <div class="stat">
           <div class="label">Possible hard braking</div>
           <div class="value"><span id="statBrakes">0</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">Idle time</div>
+          <div class="value"><span id="statIdle">0:00</span></div>
         </div>
       </section>
 
@@ -410,7 +423,9 @@
         var statDist = document.getElementById("statDist");
         var statTime = document.getElementById("statTime");
         var statBrakes = document.getElementById("statBrakes");
+        var statIdle = document.getElementById("statIdle");
         var tripHistory = document.getElementById("tripHistory");
+        var busRouteInput = document.getElementById("busRoute");
         var busNumberInput = document.getElementById("busNumber");
         var directionInput = document.getElementById("direction");
 
@@ -463,12 +478,17 @@
         function renderStats() {
           statMax.textContent = Math.round(maxKmh);
           var currentTrip = trip || displayedTrip;
-          var elapsed = currentTrip ? (trip ? Math.max(0, Date.now() - trip.startedAt) : (currentTrip.elapsedMs || 0)) : 0;
-          var avg = elapsed > 0 ? (distM / 1000) / (elapsed / 3600000) : 0;
+          var now = Date.now();
+          var elapsed = currentTrip ? (trip ? Math.max(0, now - trip.startedAt) : (currentTrip.elapsedMs || 0)) : 0;
+          var idle = currentTrip ? Number(currentTrip.idleTimeMs || 0) : 0;
+          if (trip && trip.isIdle && trip.lastSpeedSampleAt) idle += Math.max(0, Math.min(now - trip.lastSpeedSampleAt, 30000));
+          var movingElapsed = Math.max(0, elapsed - idle);
+          var avg = movingElapsed > 0 ? (distM / 1000) / (movingElapsed / 3600000) : 0;
           statAvg.textContent = avg.toFixed(1);
           statDist.textContent = (distM / 1000).toFixed(2);
           statTime.textContent = fmtTime(elapsed);
           statBrakes.textContent = brakeCount;
+          statIdle.textContent = fmtTime(idle);
         }
 
         // ---------- needle animation ----------
@@ -583,6 +603,18 @@
           var smooth = median(recent);
           if (smooth < 1.2) smooth = 0;
           targetKmh = smooth;
+          var isIdleNow = smooth === 0;
+          if (trip.lastSpeedSampleAt) {
+            var sampleInterval = t - trip.lastSpeedSampleAt;
+            if (trip.isIdle && sampleInterval > 0 && sampleInterval <= 30000) {
+              trip.idleTimeMs = (trip.idleTimeMs || 0) + sampleInterval;
+            }
+          } else if (isIdleNow) {
+            var initialIdle = t - trip.startedAt;
+            if (initialIdle > 0 && initialIdle <= 30000) trip.idleTimeMs = initialIdle;
+          }
+          trip.lastSpeedSampleAt = t;
+          trip.isIdle = isIdleNow;
           observation.speedKmh = Number(kmh.toFixed(2));
           observation.accepted = observation.rejectionReason === "" || observation.rejectionReason === "no_usable_speed_sample";
           if (!observation.rejectionReason) observation.rejectionReason = null;
@@ -653,7 +685,7 @@
           hideMsg();
           if (!trip) {
             maxKmh = 0; distM = 0; brakeCount = 0; lastBrakeAt = 0; recent = []; displayedTrip = null;
-            trip = { id: "trip-" + Date.now(), startedAt: Date.now(), stoppedAt: null, busNumberOrId: busNumberInput.value.trim() || null, direction: directionInput.value.trim() || null, distanceM: 0, maxSpeedKmh: 0, possibleHardBrakingEvents: 0, brakingEvents: [], observations: [], complete: false, interrupted: false };
+            trip = { id: "trip-" + Date.now(), startedAt: Date.now(), stoppedAt: null, busRoute: busRouteInput.value.trim() || null, busNumber: busNumberInput.value.trim() || null, direction: directionInput.value || null, distanceM: 0, maxSpeedKmh: 0, idleTimeMs: 0, isIdle: false, lastSpeedSampleAt: null, possibleHardBrakingEvents: 0, brakingEvents: [], observations: [], complete: false, interrupted: false };
           }
           setStatus("wait", "Waiting for a GPS signal…");
           tracking = true;
@@ -677,10 +709,17 @@
           targetKmh = 0;
           lastFix = null;
           trip.stoppedAt = interrupted ? (trip.observations.length ? Date.parse(trip.observations[trip.observations.length - 1].timestamp) : Date.now()) : Date.now();
+          if (trip.isIdle && trip.lastSpeedSampleAt) {
+            var finalIdleInterval = trip.stoppedAt - trip.lastSpeedSampleAt;
+            if (finalIdleInterval > 0 && finalIdleInterval <= 30000) trip.idleTimeMs = (trip.idleTimeMs || 0) + finalIdleInterval;
+          }
+          trip.isIdle = false;
           trip.elapsedMs = Math.max(0, trip.stoppedAt - trip.startedAt);
+          trip.idleTimeMs = Number(trip.idleTimeMs || 0);
           trip.distanceM = distM;
           trip.maxSpeedKmh = maxKmh;
-          trip.averageSpeedKmh = trip.elapsedMs > 0 ? (distM / 1000) / (trip.elapsedMs / 3600000) : 0;
+          var movingElapsedMs = Math.max(0, trip.elapsedMs - trip.idleTimeMs);
+          trip.averageSpeedKmh = movingElapsedMs > 0 ? (distM / 1000) / (movingElapsedMs / 3600000) : 0;
           trip.possibleHardBrakingEvents = brakeCount;
           trip.complete = !interrupted;
           trip.interrupted = !!interrupted;
@@ -714,7 +753,7 @@
             title.textContent = new Date(saved.startedAt).toLocaleString() + (saved.interrupted ? " · Interrupted" : "");
             var detail = document.createElement("div");
             detail.className = "trip-detail";
-            detail.textContent = (saved.busNumberOrId ? "Bus " + saved.busNumberOrId + " · " : "") + (saved.direction ? saved.direction + " · " : "") + "Duration " + fmtTime(saved.elapsedMs || 0) + " · Distance " + ((saved.distanceM || 0) / 1000).toFixed(2) + " km · Top " + Math.round(saved.maxSpeedKmh || 0) + " km/h · Average " + Number(saved.averageSpeedKmh || 0).toFixed(1) + " km/h · Possible hard braking " + (saved.possibleHardBrakingEvents || 0) + " · " + ((saved.observations || []).length) + " GPS observations";
+            detail.textContent = (saved.busRoute ? "Route " + saved.busRoute + " · " : "") + (saved.busNumber ? "Bus " + saved.busNumber + " · " : (saved.busNumberOrId ? "Bus " + saved.busNumberOrId + " · " : "")) + (saved.direction ? "Direction " + saved.direction + " · " : "") + "Duration " + fmtTime(saved.elapsedMs || 0) + " · Distance " + ((saved.distanceM || 0) / 1000).toFixed(2) + " km · Top " + Math.round(saved.maxSpeedKmh || 0) + " km/h · Average " + Number(saved.averageSpeedKmh || 0).toFixed(1) + " km/h · Idle " + fmtTime(saved.idleTimeMs || 0) + " · Possible hard braking " + (saved.possibleHardBrakingEvents || 0) + " · " + ((saved.observations || []).length) + " GPS observations";
             var actions = document.createElement("div");
             actions.className = "trip-actions";
             var download = document.createElement("button");
@@ -757,7 +796,9 @@
           recovered.interruptionReason = "Page was reloaded or tracking was interrupted";
           recovered.distanceM = recovered.distanceM || 0;
           recovered.maxSpeedKmh = recovered.maxSpeedKmh || 0;
-          recovered.averageSpeedKmh = recovered.elapsedMs > 0 ? (recovered.distanceM / 1000) / (recovered.elapsedMs / 3600000) : 0;
+          recovered.idleTimeMs = Number(recovered.idleTimeMs || 0);
+          var recoveredMovingMs = Math.max(0, recovered.elapsedMs - recovered.idleTimeMs);
+          recovered.averageSpeedKmh = recoveredMovingMs > 0 ? (recovered.distanceM / 1000) / (recoveredMovingMs / 3600000) : 0;
           savedTrips.unshift(recovered); savedTrips = savedTrips.slice(0, 30); saveTrips();
           displayedTrip = recovered;
           maxKmh = Number(recovered.maxSpeedKmh || 0); distM = Number(recovered.distanceM || 0); brakeCount = Number(recovered.possibleHardBrakingEvents || 0);
