@@ -49,7 +49,11 @@
       }
 
       * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; }
+      html, body {
+        margin: 0; padding: 0;
+        /* Stop Android Chrome's pull-to-refresh from discarding an active ride. */
+        overscroll-behavior-y: none;
+      }
       body {
         font-family: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
         background: linear-gradient(180deg, var(--bg) 0%, var(--bg-grad) 100%);
@@ -373,6 +377,7 @@
         var MS_TO_KMH = 3.6;
         var STORAGE_KEY = "speedbus.tripRecords.v1";
         var ACTIVE_KEY = "speedbus.activeTrip.v1";
+        var TRIP_INFO_KEY = "speedbus.tripInfo.v1";
         var MAX_ACCURACY_M = 35;
         var MAX_SPEED_KMH = 130;
 
@@ -512,6 +517,16 @@
           try { var value = localStorage.getItem(key); return value ? JSON.parse(value) : fallback; }
           catch (e) { return fallback; }
         }
+        function saveTripInfo() {
+          try {
+            localStorage.setItem(TRIP_INFO_KEY, JSON.stringify({
+              busNumberOrId: busNumberInput.value,
+              direction: directionInput.value
+            }));
+          } catch (e) { /* Trip recording can continue if browser storage is unavailable. */ }
+        }
+        busNumberInput.addEventListener("input", saveTripInfo);
+        directionInput.addEventListener("input", saveTripInfo);
         function saveActive() {
           if (!trip) return;
           try { localStorage.setItem(ACTIVE_KEY, JSON.stringify(trip)); }
@@ -740,6 +755,9 @@
         });
 
         // ---------- init ----------
+        var savedTripInfo = storageRead(TRIP_INFO_KEY, {});
+        busNumberInput.value = savedTripInfo.busNumberOrId || "";
+        directionInput.value = savedTripInfo.direction || "";
         savedTrips = storageRead(STORAGE_KEY, []);
         if (!Array.isArray(savedTrips)) savedTrips = [];
         if (savedTrips.length) {
@@ -772,4 +790,5 @@
     </script>
   </body>
 </html>
+
 
