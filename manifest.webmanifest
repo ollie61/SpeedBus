@@ -1,0 +1,20 @@
+{
+  "id": "./speedometer.html",
+  "name": "SpeedBus — STM Trip Recorder",
+  "short_name": "SpeedBus",
+  "start_url": "./speedometer.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eceee9",
+  "theme_color": "#1d8a4e",
+  "description": "Passenger-operated STM bus trip recorder",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./speedbus-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
