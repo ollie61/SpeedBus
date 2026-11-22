@@ -346,3 +346,18 @@ button, [role="button"], select, summary, input:not([type="checkbox"], [type="ra
       .empty-history { color: var(--ink-soft); margin: 0; font-size: 0.92rem; }
       .disclaimer { font-size: 0.84rem; line-height: 1.5; color: var(--ink-soft); margin: 0; }
       .btn-main:focus-visible, .trip-actions button:focus-visible { outline: 3px solid #287ac5; outline-offset: 3px; }
+
+      .btn-delete-all {
+        justify-self: start;
+        appearance: none;
+        border: 1.5px solid var(--bad);
+        border-radius: 10px;
+        background: var(--card);
+        color: var(--bad);
+        font: inherit;
+        font-weight: 700;
+        padding: 9px 13px;
+        min-height: 44px;
+        cursor: pointer;
+      }
+      .btn-delete-all[hidden] { display: none; }
