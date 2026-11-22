@@ -19,7 +19,7 @@
   </head>
   <body>
     <main>
-      <header class="brand"><h1>SpeedBus</h1><span class="version">TRIP RECORDER · v0.2.5</span></header>
+      <header class="brand"><h1>SpeedBus</h1><span class="version">TRIP RECORDER · v0.2.6</span></header>
       <div class="status-row">
         <span class="status" role="status" aria-live="polite"><span class="dot" id="dot"></span><span id="statusText">Ready to record a trip</span></span>
         <span class="accuracy" id="accuracy"></span>
@@ -116,7 +116,8 @@
 
       <p class="note">Enter the route, bus number and direction, then tap <strong>START TRIP</strong>. Tap <strong>STOP TRIP</strong> when you get off. If location access is blocked, the session stays open so you can test the controls, but no trip is saved without GPS readings.</p>
       <details class="history" id="historyDisclosure" hidden>
-        <summary>Completed trips saved on this phone</summary>
+        <summary>Saved trips on this phone</summary>
+        <button class="btn-delete-all" id="deleteAllTripsBtn" type="button" hidden>Delete all saved trips</button>
         <div id="tripHistory"></div>
       </details>
       <p class="disclaimer">Trip records stay in this browser on this phone. GPS readings can be inaccurate and are for personal reporting only; they are not certified evidence of speeding or dangerous driving. Use the browser’s download option to save a trip report file.</p>
