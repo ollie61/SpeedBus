@@ -58,6 +58,7 @@
         var statBrakes = document.getElementById("statBrakes");
         var statIdle = document.getElementById("statIdle");
         var tripHistory = document.getElementById("tripHistory");
+        var deleteAllTripsBtn = document.getElementById("deleteAllTripsBtn");
         var historyDisclosure = document.getElementById("historyDisclosure");
         var mapPanel = document.getElementById("mapPanel");
         var tripMapEl = document.getElementById("tripMap");
@@ -541,9 +542,18 @@
         }
         function renderHistory() {
           var displayableTrips = savedTrips.filter(isDisplayableTrip);
-          if (!displayableTrips.length) { tripHistory.innerHTML = ""; historyDisclosure.hidden = true; return; }
-          historyDisclosure.hidden = false;
+          historyDisclosure.hidden = savedTrips.length === 0;
+          deleteAllTripsBtn.hidden = savedTrips.length === 0;
           tripHistory.innerHTML = "";
+          if (!displayableTrips.length) {
+            if (savedTrips.length) {
+              var empty = document.createElement("p");
+              empty.className = "empty-history";
+              empty.textContent = "No completed trips are available. You can still delete saved trip data below.";
+              tripHistory.appendChild(empty);
+            }
+            return;
+          }
           displayableTrips.forEach(function (saved, index) {
             var card = document.createElement("article");
             card.className = "trip-card";
@@ -558,10 +568,16 @@
             viewMap.type = "button"; viewMap.textContent = "View trip map";
             viewMap.addEventListener("click", function () { showTripMap(saved); });
             actions.appendChild(viewMap);
+            var report = document.createElement("button"); report.type = "button"; report.textContent = "Create PDF report";
+            report.addEventListener("click", function () { openTripReport(saved); });
+            actions.appendChild(report);
             var download = document.createElement("button");
             download.type = "button"; download.textContent = "Download trip JSON";
             download.addEventListener("click", function () { downloadTrip(saved, index); });
             actions.appendChild(download);
+            var remove = document.createElement("button"); remove.type = "button"; remove.textContent = "Delete trip";
+            remove.addEventListener("click", function () { deleteSavedTrip(saved); });
+            actions.appendChild(remove);
             card.appendChild(title); card.appendChild(detail); card.appendChild(actions);
             tripHistory.appendChild(card);
           });
@@ -574,6 +590,79 @@
           link.download = "speedbus-trip-" + new Date(saved.startedAt).toISOString().replace(/[:.]/g, "-") + ".json";
           document.body.appendChild(link); link.click(); link.remove();
           setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+        }
+
+
+        function deleteSavedTrip(saved) {
+          if (!saved || !window.confirm("Delete this trip and its saved JSON data from this phone? This cannot be undone.")) return;
+          savedTrips = savedTrips.filter(function (item) { return item !== saved && !(saved.id && item.id === saved.id); });
+          saveTrips();
+          if (displayedTrip === saved || (displayedTrip && saved.id && displayedTrip.id === saved.id)) {
+            displayedTrip = null; mapPanel.hidden = true; renderStats();
+          }
+          renderHistory();
+        }
+        deleteAllTripsBtn.addEventListener("click", function () {
+          if (!savedTrips.length || !window.confirm("Delete all saved trip JSON data from this phone? This cannot be undone.")) return;
+          savedTrips = []; displayedTrip = null; mapPanel.hidden = true;
+          saveTrips(); renderStats(); renderHistory();
+        });
+        function reportEscape(value) {
+          return String(value == null ? "" : value).replace(/[&<>"']/g, function (c) {
+            return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c];
+          });
+        }
+        function makeReportMap(saved) {
+          var pts = (saved.observations || []).filter(function (p) {
+            return p && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) &&
+              Number.isFinite(Number(p.accuracyM)) && Number(p.accuracyM) <= 35;
+          });
+          if (pts.length < 2) return { svg:'<p>Not enough accurate GPS points to draw this route.</p>', zones:0, matched:0 };
+          var lat0 = pts.reduce(function (s,p) { return s + Number(p.latitude); },0) / pts.length;
+          var xs = pts.map(function(p){ return Number(p.longitude)*Math.cos(lat0*Math.PI/180); });
+          var ys = pts.map(function(p){ return Number(p.latitude); });
+          var minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs), minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
+          var W=760,H=380,P=28,scale=Math.min((W-2*P)/Math.max(maxX-minX,1e-5),(H-2*P)/Math.max(maxY-minY,1e-5));
+          var xy=pts.map(function(p,i){return [P+(xs[i]-minX)*scale,H-P-(ys[i]-minY)*scale];});
+          var path=xy.map(function(p,i){return (i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1);}).join(" ");
+          var red="",zones=0,matched=0;
+          for(var i=1;i<pts.length;i++){
+            var a=pts[i-1],b=pts[i],s1=Number(a.speedKmh),s2=Number(b.speedKmh);
+            var valid=a.speedKmh!=null&&b.speedKmh!=null&&a.rejectionReason!=="no_usable_speed_sample"&&b.rejectionReason!=="no_usable_speed_sample"&&Number.isFinite(s1)&&Number.isFinite(s2);
+            var limit=nearestSpeedLimit((Number(a.latitude)+Number(b.latitude))/2,(Number(a.longitude)+Number(b.longitude))/2);
+            if(limit!==null)matched++;
+            if(valid&&limit!==null&&(s1+s2)/2>=limit+5){zones++;red+='<line x1="'+xy[i-1][0].toFixed(1)+'" y1="'+xy[i-1][1].toFixed(1)+'" x2="'+xy[i][0].toFixed(1)+'" y2="'+xy[i][1].toFixed(1)+'"/>';}
+          }
+          var first=xy[0],last=xy[xy.length-1];
+          var svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="GPS route with high-speed zones in red"><rect width="'+W+'" height="'+H+'" rx="12" fill="#f3f6f8"/>'+
+            '<path d="'+path+'" fill="none" stroke="#1677d2" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>'+
+            '<g stroke="#d62828" stroke-width="11" stroke-linecap="round">'+red+'</g>'+
+            '<circle cx="'+first[0]+'" cy="'+first[1]+'" r="9" fill="#16864a"/><circle cx="'+last[0]+'" cy="'+last[1]+'" r="9" fill="#25313b"/></svg>';
+          return {svg:svg,zones:zones,matched:matched};
+        }
+        function openTripReport(saved) {
+          var win=window.open("","_blank");
+          if(!win){showMsg("Report window blocked","Allow pop-ups for SpeedBus, then choose Create PDF report again.");return;}
+          win.document.write('<!doctype html><title>Preparing report…</title><p style="font:16px Arial;padding:24px">Preparing report and matching Montréal speed limits…</p>');
+          ensureSpeedLimitGrid().catch(function(){return null;}).then(function(){
+            var map=makeReportMap(saved), comments=Array.isArray(saved.comments)?saved.comments:[];
+            var route=(saved.busRoute?"STM "+saved.busRoute+(saved.busRouteName?" — "+saved.busRouteName:""):"Route unavailable")+
+              (saved.busNumber?" · Bus "+reportEscape(saved.busNumber):"")+(saved.direction?" · "+reportEscape(saved.direction):"");
+            var rows=[["Top speed",Math.round(Number(saved.maxSpeedKmh||0))+" km/h"],["Average while moving",Number(saved.averageSpeedKmh||0).toFixed(1)+" km/h"],
+              ["Distance",(Number(saved.distanceM||0)/1000).toFixed(2)+" km"],["Duration",fmtTime(saved.elapsedMs||0)],
+              ["Idle time",fmtTime(saved.idleTimeMs||0)],["Possible hard braking",Number(saved.possibleHardBrakingEvents||0)]];
+            var facts=rows.map(function(r){return '<div><small>'+r[0]+'</small><strong>'+r[1]+'</strong></div>';}).join("");
+            var notes=comments.length?comments.map(function(c){return '<li><b>'+fmtTime(c.elapsedMs||0)+'</b> — '+reportEscape(c.text)+'</li>';}).join(""):"<li>No comments recorded.</li>";
+            var speedNote=map.matched?map.zones+" mapped segments reached at least 5 km/h above a matched Montréal permanent speed limit.":"No speed-limit segments matched; red zones could not be classified.";
+            var html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SpeedBus Trip Report</title><style>'+
+              '@page{size:A4;margin:14mm}body{font:14px/1.45 Arial,sans-serif;color:#17212b;max-width:850px;margin:auto}header{border-bottom:3px solid #18864a;padding:0 0 12px}h1{margin:0}h2{font-size:18px;margin:20px 0 8px}.actions{margin:14px 0}button{padding:12px 16px;background:#18864a;color:white;border:0;border-radius:8px;font-weight:bold}.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}.facts div{border:1px solid #ccd4da;border-radius:8px;padding:10px}.facts small,.facts strong{display:block}.facts small{color:#52606c;text-transform:uppercase;font-size:10px}.facts strong{font-size:17px}svg{width:100%;height:auto;border:1px solid #ccd4da;border-radius:10px}.legend{margin:8px 0}.blue{color:#1677d2}.red{color:#d62828}.fine{font-size:11px;color:#52606c;border-top:1px solid #ccd4da;padding-top:8px}@media print{.actions{display:none}body{max-width:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'+
+              '</style></head><body><header><h1>SpeedBus Trip Report</h1><p>'+route+'</p><div>Started: '+reportEscape(new Date(saved.startedAt).toLocaleString())+' · Stopped: '+reportEscape(new Date(saved.stoppedAt||saved.startedAt).toLocaleString())+'</div></header>'+
+              '<div class="actions"><button onclick="window.print()">Print / Save as PDF</button></div><div class="facts">'+facts+'</div><h2>Route map</h2>'+map.svg+
+              '<p class="legend"><b class="blue">Blue</b>: recorded route &nbsp; <b class="red">Red</b>: high-speed zone &nbsp; Green: start</p>'+
+              '<p>'+speedNote+' GPS route sketch; no street labels. School-period limits are not applied automatically.</p><h2>Trip comments</h2><ul>'+notes+'</ul>'+
+              '<p class="fine">GPS readings can be inaccurate. This summary is for personal review and is not certified evidence. Route and GPS accuracy are approximate.</p></body></html>';
+            win.document.open();win.document.write(html);win.document.close();
+          });
         }
 
         function loadScriptOnce(id, src) {
