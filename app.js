@@ -617,51 +617,56 @@
             return p && Number.isFinite(Number(p.latitude)) && Number.isFinite(Number(p.longitude)) &&
               Number.isFinite(Number(p.accuracyM)) && Number(p.accuracyM) <= 35;
           });
-          if (pts.length < 2) return { svg:'<p>Not enough accurate GPS points to draw this route.</p>', zones:0, matched:0 };
-          var lat0 = pts.reduce(function (s,p) { return s + Number(p.latitude); },0) / pts.length;
-          var xs = pts.map(function(p){ return Number(p.longitude)*Math.cos(lat0*Math.PI/180); });
-          var ys = pts.map(function(p){ return Number(p.latitude); });
-          var minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs), minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
-          var W=760,H=380,P=28,scale=Math.min((W-2*P)/Math.max(maxX-minX,1e-5),(H-2*P)/Math.max(maxY-minY,1e-5));
-          var xy=pts.map(function(p,i){return [P+(xs[i]-minX)*scale,H-P-(ys[i]-minY)*scale];});
-          var path=xy.map(function(p,i){return (i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1);}).join(" ");
-          var red="",zones=0,matched=0;
-          for(var i=1;i<pts.length;i++){
-            var a=pts[i-1],b=pts[i],s1=Number(a.speedKmh),s2=Number(b.speedKmh);
-            var valid=a.speedKmh!=null&&b.speedKmh!=null&&a.rejectionReason!=="no_usable_speed_sample"&&b.rejectionReason!=="no_usable_speed_sample"&&Number.isFinite(s1)&&Number.isFinite(s2);
-            var limit=nearestSpeedLimit((Number(a.latitude)+Number(b.latitude))/2,(Number(a.longitude)+Number(b.longitude))/2);
-            if(limit!==null)matched++;
-            if(valid&&limit!==null&&(s1+s2)/2>=limit+5){zones++;red+='<line x1="'+xy[i-1][0].toFixed(1)+'" y1="'+xy[i-1][1].toFixed(1)+'" x2="'+xy[i][0].toFixed(1)+'" y2="'+xy[i][1].toFixed(1)+'"/>';}
+          var redSegments = [], zones = 0, matched = 0;
+          for (var i = 1; i < pts.length; i++) {
+            var a = pts[i - 1], b = pts[i], s1 = Number(a.speedKmh), s2 = Number(b.speedKmh);
+            var valid = a.speedKmh != null && b.speedKmh != null &&
+              a.rejectionReason !== "no_usable_speed_sample" &&
+              b.rejectionReason !== "no_usable_speed_sample" &&
+              Number.isFinite(s1) && Number.isFinite(s2);
+            var limit = nearestSpeedLimit(
+              (Number(a.latitude) + Number(b.latitude)) / 2,
+              (Number(a.longitude) + Number(b.longitude)) / 2
+            );
+            if (limit !== null) matched++;
+            var red = valid && limit !== null && (s1 + s2) / 2 >= limit + 5;
+            if (red) { zones++; redSegments.push(i); }
           }
-          var first=xy[0],last=xy[xy.length-1];
-          var svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="GPS route with high-speed zones in red"><rect width="'+W+'" height="'+H+'" rx="12" fill="#f3f6f8"/>'+
-            '<path d="'+path+'" fill="none" stroke="#1677d2" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>'+
-            '<g stroke="#d62828" stroke-width="11" stroke-linecap="round">'+red+'</g>'+
-            '<circle cx="'+first[0]+'" cy="'+first[1]+'" r="9" fill="#16864a"/><circle cx="'+last[0]+'" cy="'+last[1]+'" r="9" fill="#25313b"/></svg>';
-          return {svg:svg,zones:zones,matched:matched};
+          return { points: pts, redSegments: redSegments, zones: zones, matched: matched };
         }
+
         function openTripReport(saved) {
-          var win=window.open("","_blank");
-          if(!win){showMsg("Report window blocked","Allow pop-ups for SpeedBus, then choose Create PDF report again.");return;}
+          var win = window.open("", "_blank");
+          if (!win) {
+            showMsg("Report window blocked", "Allow pop-ups for SpeedBus, then choose Create PDF report again.");
+            return;
+          }
           win.document.write('<!doctype html><title>Preparing report…</title><p style="font:16px Arial;padding:24px">Preparing report and matching Montréal speed limits…</p>');
-          ensureSpeedLimitGrid().catch(function(){return null;}).then(function(){
-            var map=makeReportMap(saved), comments=Array.isArray(saved.comments)?saved.comments:[];
-            var route=(saved.busRoute?"STM "+saved.busRoute+(saved.busRouteName?" — "+saved.busRouteName:""):"Route unavailable")+
-              (saved.busNumber?" · Bus "+reportEscape(saved.busNumber):"")+(saved.direction?" · "+reportEscape(saved.direction):"");
-            var rows=[["Top speed",Math.round(Number(saved.maxSpeedKmh||0))+" km/h"],["Average while moving",Number(saved.averageSpeedKmh||0).toFixed(1)+" km/h"],
-              ["Distance",(Number(saved.distanceM||0)/1000).toFixed(2)+" km"],["Duration",fmtTime(saved.elapsedMs||0)],
-              ["Idle time",fmtTime(saved.idleTimeMs||0)],["Possible hard braking",Number(saved.possibleHardBrakingEvents||0)]];
-            var facts=rows.map(function(r){return '<div><small>'+r[0]+'</small><strong>'+r[1]+'</strong></div>';}).join("");
-            var notes=comments.length?comments.map(function(c){return '<li><b>'+fmtTime(c.elapsedMs||0)+'</b> — '+reportEscape(c.text)+'</li>';}).join(""):"<li>No comments recorded.</li>";
-            var speedNote=map.matched?map.zones+" mapped segments reached at least 5 km/h above a matched Montréal permanent speed limit.":"No speed-limit segments matched; red zones could not be classified.";
-            var html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SpeedBus Trip Report</title><style>'+
-              '@page{size:A4;margin:14mm}body{font:14px/1.45 Arial,sans-serif;color:#17212b;max-width:850px;margin:auto}header{border-bottom:3px solid #18864a;padding:0 0 12px}h1{margin:0}h2{font-size:18px;margin:20px 0 8px}.actions{margin:14px 0}button{padding:12px 16px;background:#18864a;color:white;border:0;border-radius:8px;font-weight:bold}.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}.facts div{border:1px solid #ccd4da;border-radius:8px;padding:10px}.facts small,.facts strong{display:block}.facts small{color:#52606c;text-transform:uppercase;font-size:10px}.facts strong{font-size:17px}svg{width:100%;height:auto;border:1px solid #ccd4da;border-radius:10px}.legend{margin:8px 0}.blue{color:#1677d2}.red{color:#d62828}.fine{font-size:11px;color:#52606c;border-top:1px solid #ccd4da;padding-top:8px}@media print{.actions{display:none}body{max-width:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'+
-              '</style></head><body><header><h1>SpeedBus Trip Report</h1><p>'+reportEscape(route)+'</p><div>Started: '+reportEscape(new Date(saved.startedAt).toLocaleString())+' · Stopped: '+reportEscape(new Date(saved.stoppedAt||saved.startedAt).toLocaleString())+'</div></header>'+
-              '<div class="actions"><button onclick="window.print()">Print / Save as PDF</button></div><div class="facts">'+facts+'</div><h2>Route map</h2>'+map.svg+
-              '<p class="legend"><b class="blue">Blue</b>: recorded route &nbsp; <b class="red">Red</b>: high-speed zone &nbsp; Green: start</p>'+
-              '<p>'+speedNote+' GPS route sketch; no street labels. School-period limits are not applied automatically.</p><h2>Trip comments</h2><ul>'+notes+'</ul>'+
-              '<p class="fine">GPS readings can be inaccurate. This summary is for personal review and is not certified evidence. Route and GPS accuracy are approximate.</p></body></html>';
-            win.document.open();win.document.write(html);win.document.close();
+          ensureSpeedLimitGrid().catch(function () { return null; }).then(function () {
+            var map = makeReportMap(saved), comments = Array.isArray(saved.comments) ? saved.comments : [];
+            var route = (saved.busRoute ? "STM " + saved.busRoute + (saved.busRouteName ? " — " + saved.busRouteName : "") : "Route unavailable") +
+              (saved.busNumber ? " · Bus " + reportEscape(saved.busNumber) : "") + (saved.direction ? " · " + reportEscape(saved.direction) : "");
+            var rows = [["Top speed", Math.round(Number(saved.maxSpeedKmh || 0)) + " km/h"], ["Average while moving", Number(saved.averageSpeedKmh || 0).toFixed(1) + " km/h"],
+              ["Distance", (Number(saved.distanceM || 0) / 1000).toFixed(2) + " km"], ["Duration", fmtTime(saved.elapsedMs || 0)],
+              ["Idle time", fmtTime(saved.idleTimeMs || 0)], ["Possible hard braking", Number(saved.possibleHardBrakingEvents || 0)]];
+            var facts = rows.map(function (r) { return '<div><small>' + r[0] + '</small><strong>' + r[1] + '</strong></div>'; }).join("");
+            var notes = comments.length ? comments.map(function (c) { return '<li><b>' + fmtTime(c.elapsedMs || 0) + '</b> — ' + reportEscape(c.text) + '</li>'; }).join("") : "<li>No comments recorded.</li>";
+            var speedNote = map.matched ? map.zones + " mapped segments reached at least 5 km/h above a matched Montréal permanent speed limit." : "No speed-limit segments matched; red zones could not be classified.";
+            var pointsJson = JSON.stringify(map.points.map(function (p) {
+              return { lat: Number(p.latitude), lon: Number(p.longitude), speed: p.speedKmh == null ? null : Number(p.speedKmh) };
+            }));
+            var redJson = JSON.stringify(map.redSegments);
+            var html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SpeedBus Trip Report</title>' +
+              '<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">' +
+              '<style>@page{size:A4;margin:14mm}body{font:14px/1.45 Arial,sans-serif;color:#17212b;max-width:850px;margin:auto}header{border-bottom:3px solid #18864a;padding:0 0 12px}h1{margin:0}h2{font-size:18px;margin:20px 0 8px}.actions{margin:14px 0}button{padding:12px 16px;background:#18864a;color:white;border:0;border-radius:8px;font-weight:bold}.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}.facts div{border:1px solid #ccd4da;border-radius:8px;padding:10px}.facts small,.facts strong{display:block}.facts small{color:#52606c;text-transform:uppercase;font-size:10px}.facts strong{font-size:17px}#reportMap{height:440px;width:100%;border:1px solid #ccd4da;border-radius:10px}.legend{margin:8px 0}.blue{color:#1677d2}.red{color:#d62828}.fine{font-size:11px;color:#52606c;border-top:1px solid #ccd4da;padding-top:8px}@media print{.actions{display:none}body{max-width:none}#reportMap{height:440px}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body>' +
+              '<header><h1>SpeedBus Trip Report</h1><p>' + reportEscape(route) + '</p><div>Started: ' + reportEscape(new Date(saved.startedAt).toLocaleString()) + ' · Stopped: ' + reportEscape(new Date(saved.stoppedAt || saved.startedAt).toLocaleString()) + '</div></header>' +
+              '<div class="actions"><button onclick="window.print()">Print / Save as PDF</button></div><div class="facts">' + facts + '</div><h2>Route map</h2><div id="reportMap" aria-label="OpenStreetMap route map"></div>' +
+              '<p class="legend"><b class="blue">Blue</b>: recorded route &nbsp; <b class="red">Red</b>: high-speed zone &nbsp; Green: start</p>' +
+              '<p>' + speedNote + ' Map tiles and street detail are provided by OpenStreetMap. School-period limits are not applied automatically.</p><h2>Trip comments</h2><ul>' + notes + '</ul>' +
+              '<p class="fine">GPS readings can be inaccurate. This summary is for personal review and is not certified evidence. Route and GPS accuracy are approximate.</p>' +
+              '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script><script>' +
+              '(function(){var pts=' + pointsJson + ',red=' + redJson + ';if(!pts.length){document.getElementById("reportMap").textContent="Not enough accurate GPS points to draw a map.";return;}var m=L.map("reportMap",{scrollWheelZoom:false});L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"}).addTo(m);var bounds=[],blue=[];pts.forEach(function(p){blue.push([p.lat,p.lon]);bounds.push([p.lat,p.lon]);});for(var i=1;i<pts.length;i++){var color=red.indexOf(i)>=0?"#d62828":"#1677d2";L.polyline([[pts[i-1].lat,pts[i-1].lon],[pts[i].lat,pts[i].lon]],{color:color,weight:6,opacity:.95}).addTo(m);}L.circleMarker(blue[0],{radius:7,color:"#fff",weight:2,fillColor:"#16864a",fillOpacity:1}).addTo(m).bindTooltip("Start");L.circleMarker(blue[blue.length-1],{radius:7,color:"#fff",weight:2,fillColor:"#25313b",fillOpacity:1}).addTo(m).bindTooltip("End");m.fitBounds(bounds,{padding:[18,18]});setTimeout(function(){m.invalidateSize();},250);})();<\/script></body></html>';
+            win.document.open(); win.document.write(html); win.document.close();
           });
         }
 
